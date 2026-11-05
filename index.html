@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Handball Feldspieler-Statistik · Version 5 -->
+<!-- Handball Feldspieler-Statistik · Version 6 -->
 <html lang="de">
 <head>
 <meta charset="utf-8">
@@ -138,6 +138,13 @@ tr[data-act]{cursor:pointer}
 .sm{font-size:12px}
 tr.top td{background:#0f2a1b}tr.flop td{background:#2e1418}
 .row span.f{font-size:14px}
+.lineup{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.lineup button{padding:8px;text-align:left;min-height:64px}
+.lineup b{display:block;font-size:22px;line-height:1}
+.lineup span{display:block;font-size:12px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.lineup i{display:block;font-style:normal;font-size:11px;margin-top:4px;font-weight:700}
+.lineup .on{background:#123a26;outline:1px solid var(--gr)}.lineup .on i{color:var(--gr)}
+.lineup .off{background:var(--card2);opacity:.45}.lineup .off b{text-decoration:line-through}.lineup .off i{color:var(--mut)}
 @media (min-width:600px){.grid{grid-template-columns:repeat(4,1fr)}main{max-width:760px;margin:0 auto}}
 </style>
 </head>
@@ -179,7 +186,7 @@ const fmtShort = ms => { const s = Math.ceil(Math.max(0, ms) / 1000); return Mat
 const vib = n => { try { navigator.userActivation?.hasBeenActive && navigator.vibrate && navigator.vibrate(n); } catch (e) {} };
 
 function defaultPlayers() { return [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14].map(nr => ({ id: uid(), nr, name: '' })); }
-function newGame(opponent) { return { id: uid(), opponent: opponent || 'Gegner', date: new Date().toISOString(), clock: 0, runStart: null, half: 1, events: [] }; }
+function newGame(opponent) { return { id: uid(), opponent: opponent || 'Gegner', date: new Date().toISOString(), clock: 0, runStart: null, half: 1, events: [], out: [] }; }
 function defaultState() { return { team: { name: 'Wir', players: defaultPlayers() }, settings: { halfMin: 25 }, game: newGame(), history: [] }; }
 function load() {
   let s = null;
@@ -240,6 +247,9 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 const roster = g => (g && g.roster) || S.team.players;
 const sorted = list => [...list].sort((a, b) => (a.nr === '' ? 999 : a.nr) - (b.nr === '' ? 999 : b.nr));
 const player = (pid, g) => roster(g).find(p => p.id === pid);
+// Spieltagskader: ausgeblendete Spieler gelten nur für das aktuelle Spiel
+const isOut = p => (S.game.out || []).includes(p.id);
+const activePlayers = () => sorted(S.team.players.filter(p => !isOut(p)));
 function pname(pid, g, short) {
   const p = player(pid, g); if (!p) return '(gelöscht)';
   return '#' + p.nr + (p.name ? ' ' + (short ? p.name.split(' ')[0] : p.name) : '');
@@ -379,9 +389,12 @@ function tileHtml(p, c, pens) {
 function renderLive() {
   const g = S.game, c = calc(g.events), pens = activePens();
   if (!S.team.players.length) return '<div class="empty">Noch keine Spieler im Kader.<br>Unter „Team“ anlegen.</div>';
+  const act = activePlayers(), nOut = S.team.players.length - act.length;
   return `<div id="kpis">${kpiHtml()}</div>
     ${topFlopHtml(c)}
-    <div class="grid" id="tiles">${sorted(S.team.players).map(p => tileHtml(p, c, pens)).join('')}</div>
+    <div class="grid" id="tiles">${act.map(p => tileHtml(p, c, pens)).join('')}</div>
+    ${act.length ? '' : '<div class="empty">Alle Spieler sind ausgeblendet.</div>'}
+    <button class="undo" data-act="lineup">👥 Spieltagskader: ${act.length} von ${S.team.players.length} dabei${nOut ? ' · ' + nOut + ' ausgeblendet' : ''}</button>
     <button class="undo" data-act="undo">↶ Letzten Eintrag rückgängig${g.events.length ? ' (' + esc(LBL[g.events[g.events.length - 1].type]) + ')' : ''}</button>`;
 }
 let lastPenKey = '';
@@ -391,7 +404,7 @@ function refreshTiles() {
   if (key === lastPenKey) return; lastPenKey = key;
   const el = document.getElementById('tiles'); if (!el) return;
   const c = calc(S.game.events);
-  el.innerHTML = sorted(S.team.players).map(p => tileHtml(p, c, pens)).join('');
+  el.innerHTML = activePlayers().map(p => tileHtml(p, c, pens)).join('');
 }
 
 /* ---------- Statistik ---------- */
@@ -470,6 +483,7 @@ function renderTeam() {
       <label class="field"><span>Eigene Mannschaft</span><input class="inp" data-f="teamname" value="${esc(S.team.name)}"></label>
       <label class="field"><span>Gegner</span><input class="inp" data-f="opp" value="${esc(S.game.opponent)}"></label>
       <label class="field"><span>Halbzeitlänge (Minuten)</span><input class="inp" type="number" inputmode="numeric" data-f="halfmin" value="${S.settings.halfMin}"></label>
+      <button class="btn" data-act="lineup">👥 Spieltagskader (${activePlayers().length} von ${S.team.players.length} dabei)</button>
       <button class="btn b-bl" data-act="share" data-v="live">📤 Spielbericht teilen</button>
       <button class="btn" data-act="newgame">🏁 Spiel abschließen & neues Spiel</button>
     </div>
@@ -511,6 +525,16 @@ function closeSheet() { UI.sheet = null; document.getElementById('sheet').innerH
 function renderSheet() {
   const el = document.getElementById('sheet');
   if (!UI.sheet) { el.innerHTML = ''; return; }
+  if (UI.sheet.lineup) {
+    const pl = sorted(S.team.players), n = activePlayers().length;
+    el.innerHTML = `<div class="sheetbg" data-act="bg"><div class="sheet">
+      <h3>Spieltagskader<small>${n} von ${pl.length} dabei</small></h3>
+      <p class="mut sm" style="margin:0 0 10px">Antippen zum Ein-/Ausblenden. Gilt nur für dieses Spiel – beim nächsten Spiel sind wieder alle dabei.</p>
+      <div class="lineup">${pl.map(p => `<button class="${isOut(p) ? 'off' : 'on'}" data-act="tog" data-v="${p.id}"><b>${esc(p.nr)}</b><span>${esc(p.name || '–')}</span><i>${isOut(p) ? 'nicht dabei' : '✓ dabei'}</i></button>`).join('')}</div>
+      <div class="acts two small" style="margin-top:10px"><button data-act="allin">Alle dabei</button><button class="b-bl" data-act="close">Fertig</button></div>
+    </div></div>`;
+    return;
+  }
   if (UI.sheet.chart) { el.innerHTML = `<div class="sheetbg" data-act="bg"><div class="sheet">${chartHtml(UI.sheet.chart)}<button class="cancel" data-act="close">Schließen</button></div></div>`; return; }
   const p = player(UI.sheet.pid); if (!p) return closeSheet();
   const s = calc(S.game.events).p[p.id] || Z();
@@ -634,7 +658,14 @@ document.addEventListener('click', ev => {
     case 'player': openSheet(v); break;
     case 'pos': UI.pos = UI.pos === v ? null : v; renderSheet(); break;
     case 'ev': add(v, UI.sheet.pid, (v === 'GOAL' || v === 'MISS' || v === 'AST') ? UI.pos : null); break;
-    case 'bg': case 'close': closeSheet(); break;
+    case 'bg': case 'close': { const lu = UI.sheet && UI.sheet.lineup; closeSheet(); if (lu) render(); break; }
+    case 'lineup': UI.sheet = { lineup: true }; document.getElementById('toast').classList.remove('show'); renderSheet(); break;
+    case 'tog': {
+      const out = S.game.out ||= [], i = out.indexOf(v);
+      if (i >= 0) out.splice(i, 1); else out.push(v);
+      save(); renderSheet(); break;
+    }
+    case 'allin': S.game.out = []; save(); renderSheet(); break;
     case 'undo': undo(); document.getElementById('toast').classList.remove('show'); break;
     case 'del': delEvent(v); break;
     case 'half': UI.half = +v; render(); break;
