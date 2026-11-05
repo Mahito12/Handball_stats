@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<!-- Handball Feldspieler-Statistik · Version 5 -->
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0d141c">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="HB Stats">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>Handball Feldspieler-Statistik</title>
+<style>
+:root{--bg:#0d141c;--card:#17212c;--card2:#223040;--line:#243243;--tx:#e8eef5;--mut:#8a9bb0;--gr:#22c55e;--rd:#ef4444;--or:#f59e0b;--bl:#3b82f6;--cy:#06b6d4;--yl:#facc15}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.3 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;touch-action:manipulation;-webkit-user-select:none;user-select:none}
+body{padding-bottom:calc(66px + env(safe-area-inset-bottom))}
+input{-webkit-user-select:text;user-select:text}
+button{font:inherit;color:inherit;border:0;background:var(--card2);border-radius:12px;cursor:pointer}
+button:active{transform:scale(.97);filter:brightness(1.25)}
+header{position:sticky;top:0;z-index:5;background:var(--bg);padding:calc(8px + env(safe-area-inset-top)) 10px 8px;border-bottom:1px solid var(--line)}
+.match{font-size:13px;color:var(--mut);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.match b{color:var(--tx)}
+.clockrow{display:flex;gap:8px;align-items:center;margin-top:6px}
+.clock{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;padding:6px 10px;background:var(--card);min-width:104px}
+.clock.run{color:var(--gr)}
+.clock small{display:block;font-size:11px;color:var(--mut);font-weight:500}
+.ss{flex:1;padding:14px 6px;font-weight:800;background:var(--gr);color:#04210f}
+.ss.run{background:var(--or);color:#2a1700}
+.to{padding:10px 8px;font-size:13px;line-height:1.15}
+.to small{display:block;color:var(--mut)}
+.pens{display:flex;flex-wrap:wrap;gap:6px}
+.pens:not(:empty){margin-top:8px}
+.chip{font-size:13px;padding:4px 9px;border-radius:999px;background:#4a2a10;color:#ffd7a8;font-variant-numeric:tabular-nums}
+.chip.str{background:var(--or);color:#2a1700;font-weight:800}
+main{padding:10px}
+.kgrp{display:grid;grid-template-columns:62px repeat(3,1fr);gap:6px;margin-bottom:6px}
+.kgrp>span{display:flex;align-items:center;font-size:11px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.4px}
+.kpi{background:var(--card);border-radius:12px;padding:7px 2px;text-align:center}
+.kpi b{display:block;font-size:20px;font-variant-numeric:tabular-nums}
+.kpi small{color:var(--mut);font-size:11px}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.tile{padding:8px;text-align:left;background:var(--card);min-height:92px;position:relative;overflow:hidden}
+.tile .nr{font-size:26px;font-weight:800;line-height:1}
+.tile .nm{font-size:12px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.tile .ln{font-size:12.5px;margin-top:4px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tile .ln i{font-style:normal;color:var(--mut);font-size:10px;margin-right:3px}
+.tile .pd{position:absolute;top:6px;right:8px;font-size:11px;color:var(--or);font-weight:800}
+.tile.out{outline:2px solid var(--or);opacity:.75}
+.tile.dq{opacity:.35}
+.tile .cd{display:block;font-size:12px;color:var(--or);font-weight:700}
+.q-g{color:var(--gr)}.q-o{color:var(--or)}.q-r{color:var(--rd)}.mut{color:var(--mut)}
+.undo{width:100%;margin-top:12px;padding:12px;background:var(--card);color:var(--mut)}
+nav{position:fixed;bottom:0;left:0;right:0;z-index:6;display:grid;grid-template-columns:repeat(4,1fr);background:#091018;border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+nav button{background:none;border-radius:0;padding:10px 0 12px;color:var(--mut);font-size:12px}
+nav button b{display:block;font-size:20px;line-height:1.1}
+nav button.on{color:var(--tx);font-weight:700}
+.sheetbg{position:fixed;inset:0;background:#000b;z-index:20;display:flex;align-items:flex-end}
+.sheet{background:var(--card);width:100%;border-radius:18px 18px 0 0;padding:14px 12px calc(14px + env(safe-area-inset-bottom));max-height:92vh;overflow:auto}
+.sheet h3{margin:0 0 4px;font-size:20px}
+.sheet h3 small{color:var(--mut);font-size:13px;font-weight:500;margin-left:6px}
+.lbl{font-size:12px;color:var(--mut);margin:12px 0 6px;font-weight:700;text-transform:uppercase;letter-spacing:.4px}
+.lbl.sm{text-transform:none;font-weight:500;letter-spacing:0;margin-top:6px}
+.poss{display:grid;grid-template-columns:repeat(8,1fr);gap:4px}
+.poss button{padding:9px 0;font-weight:700;font-size:13px}
+.poss button.on{background:var(--bl);color:#fff}
+.acts{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.acts button{padding:17px 4px;font-size:15px;font-weight:800;line-height:1.15}
+.acts.two{grid-template-columns:1fr 1fr}
+.acts.small button{padding:11px 4px;font-size:14px}
+.acts button{hyphens:manual}
+.b-gr{background:var(--gr)!important;color:#04210f}.b-rd{background:var(--rd)!important;color:#fff}.b-or{background:var(--or)!important;color:#2a1700}.b-bl{background:var(--bl)!important;color:#fff}.b-cy{background:var(--cy)!important;color:#022a33}.b-gr2{background:#15803d!important;color:#fff}.b-yl{background:var(--yl)!important;color:#2a2200}
+.cancel{width:100%;margin-top:12px;padding:13px;background:transparent;color:var(--mut);border:1px solid var(--line)}
+.card{background:var(--card);border-radius:14px;padding:12px;margin-bottom:10px}
+.card h4{margin:0 0 8px;font-size:14px;color:var(--mut);font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px}
+.seg button{padding:10px 0;font-weight:600;background:var(--card)}
+.seg button.on{background:var(--bl);color:#fff}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stats div{background:var(--card2);border-radius:10px;padding:8px;text-align:center}
+.stats b{display:block;font-size:19px;font-variant-numeric:tabular-nums}
+.stats small{font-size:11px;color:var(--mut)}
+table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+th{color:var(--mut);font-weight:600;text-align:right;padding:5px 3px;border-bottom:1px solid var(--line);font-size:11px}
+td{padding:7px 3px;text-align:right;border-bottom:1px solid #1c2733}
+th:nth-child(-n+2),td:nth-child(-n+2){text-align:left}
+td.nmc{max-width:90px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tl{display:grid;grid-template-columns:52px 1fr 44px 1fr;align-items:center;gap:6px;font-size:13px;margin:4px 0;font-variant-numeric:tabular-nums}
+.bar{height:12px;border-radius:4px}
+.bar.a{background:var(--gr);justify-self:end}.bar.b{background:var(--rd)}
+.tl .r{text-align:center;font-weight:700}
+.legend{font-size:12px;color:var(--mut);margin-bottom:6px}
+.ev{display:flex;align-items:center;gap:8px;padding:9px 4px;border-bottom:1px solid var(--line)}
+.ev .t{color:var(--mut);font-variant-numeric:tabular-nums;width:46px;font-size:13px}
+.ev .d{flex:1}
+.ev button{background:none;color:var(--mut);padding:4px 8px;font-size:18px}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px;vertical-align:middle}
+.row{display:flex;gap:6px;align-items:center;margin:6px 0}
+.row input,.inp{background:var(--card2);border:1px solid var(--line);color:var(--tx);border-radius:10px;padding:10px;font:inherit;min-width:0}
+.row .n{width:62px;text-align:center}
+.row .f{flex:1}
+.xbtn{background:none;color:var(--mut);font-size:20px;padding:6px 8px}
+.btn{width:100%;padding:13px;font-weight:700;margin-top:8px}
+.field{display:block;margin:8px 0}
+.field span{display:block;font-size:12px;color:var(--mut);margin-bottom:4px}
+.field .inp{width:100%}
+.banner{background:#1d2f4d;border:1px solid var(--bl);border-radius:12px;padding:10px;margin-bottom:10px;display:flex;gap:8px;align-items:center}
+.banner div{flex:1;font-size:14px}
+.banner button{padding:8px 12px}
+.hist{display:flex;gap:6px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
+.hist div{flex:1}
+.hist small{color:var(--mut)}
+.hist button{padding:8px 10px;font-size:13px}
+.empty{color:var(--mut);text-align:center;padding:20px}
+#toast{position:fixed;left:10px;right:10px;bottom:calc(76px + env(safe-area-inset-bottom));z-index:30;background:#f1f5f9;color:#0d141c;border-radius:12px;padding:10px 12px;display:flex;align-items:center;gap:10px;font-weight:600;box-shadow:0 6px 20px #0008;transform:translateY(20px);opacity:0;pointer-events:none;transition:.18s}
+#toast.show{transform:none;opacity:1;pointer-events:auto}
+#toast span{flex:1}
+#toast button{background:#0d141c;color:#fff;padding:8px 12px;font-size:13px}
+.tile .hp{font-size:11px;font-weight:800;margin-left:6px;vertical-align:5px;background:var(--card2);padding:2px 5px;border-radius:6px}
+.row select{background:var(--card2);border:1px solid var(--line);color:var(--tx);border-radius:10px;padding:10px 2px;font:inherit;font-size:13px;width:88px}
+tr[data-act]{cursor:pointer}
+.chart{width:100%;height:auto;display:block;margin:6px 0}
+.chart text{fill:var(--mut);font-size:11px}
+.chart .gl{stroke:var(--line);stroke-width:1}
+.chart .ln{fill:none;stroke:var(--bl);stroke-width:3;stroke-linejoin:round}
+.chart circle{fill:var(--tx);stroke:var(--bl);stroke-width:2}
+.chart .vl{fill:var(--tx);font-weight:700;font-size:11px}
+.tf{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:4px}
+.tf>div{background:var(--card);border-radius:12px;padding:8px;min-width:0}
+.tf h5{margin:0 0 4px;font-size:12px;text-transform:uppercase;letter-spacing:.4px}
+.rk{display:flex;gap:5px;align-items:baseline;font-size:14px;padding:2px 0;font-variant-numeric:tabular-nums}
+.rk .i{color:var(--mut);font-size:12px;width:16px}
+.rk .n{flex:1;min-width:0;color:var(--mut);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rk .v{font-weight:800}
+.sm{font-size:12px}
+tr.top td{background:#0f2a1b}tr.flop td{background:#2e1418}
+.row span.f{font-size:14px}
+@media (min-width:600px){.grid{grid-template-columns:repeat(4,1fr)}main{max-width:760px;margin:0 auto}}
+</style>
+</head>
+<body>
+<header id="hdr"></header>
+<main id="main"></main>
+<nav id="nav">
+  <button data-act="tab" data-v="live"><b>⚡</b>Live</button>
+  <button data-act="tab" data-v="stats"><b>📊</b>Statistik</button>
+  <button data-act="tab" data-v="log"><b>🕑</b>Verlauf</button>
+  <button data-act="tab" data-v="team"><b>👥</b>Team</button>
+</nav>
+<div id="sheet"></div>
+<div id="toast"><span></span><button data-act="undo">Rückgängig</button></div>
+
+<script>
+'use strict';
+const LS_KEY = 'hbstats.v2';
+const POS = [['LA','Linksaußen'],['RL','Rückraum links'],['RM','Rückraum Mitte'],['RR','Rückraum rechts'],['RA','Rechtsaußen'],['KM','Kreis'],['GS','Gegenstoß'],['7m','7-Meter']];
+// Angriff: GOAL, MISS, TF  ·  Abwehr: BG, BLK, DERR, C7M, PEN (+ YEL, RED)  ·  Team: TO
+const LBL = {GOAL:'Tor',MISS:'Fehlwurf',AST:'Assist',OFD:'Stürmerfoul herausgeholt',TF:'Techn. Fehler',BG:'Ballgewinn',BLK:'Block',DERR:'Fehler → Gegentor',C7M:'7m verursacht',PEN:'2 Minuten',YEL:'Gelbe Karte',RED:'Rote Karte',TO:'Auszeit'};
+const COL = {GOAL:'var(--gr)',MISS:'var(--rd)',AST:'var(--gr)',OFD:'var(--cy)',TF:'var(--or)',BG:'var(--bl)',BLK:'var(--cy)',DERR:'var(--rd)',C7M:'var(--or)',PEN:'var(--or)',YEL:'var(--yl)',RED:'var(--rd)',TO:'var(--mut)'};
+const PEN_MS = 120000;
+// HPI nach HBL-Vorbild (opel-hbl.de › Statistiken › Handball Performance Index › Berechnung, Stand 2026/27)
+// Jeder Spieler startet mit 100 HPI-Punkten. Wurfpunkte je Wurfposition: [Tor, Fehlwurf]
+const SHOT_P = { LA: [7, -7], RA: [7, -7], RL: [10, -4], RM: [10, -4], RR: [10, -4], KM: [6, -7], GS: [5, -8], '7m': [6, -8], '': [7, -6] };
+// Assist-Punkte je Position des Torwurfs (7m = Strafwurf herausgeholt)
+const AST_P = { LA: 3, RA: 3, RL: 0, RM: 0, RR: 0, KM: 4, GS: 5, '7m': 4, '': 3 };
+const EV_P = { TF: -6, BG: 8, BLK: 7, OFD: 8, C7M: -3, RED: -12, YEL: 0, DERR: 0 };  // DERR ist nicht Teil des HBL-HPI
+const PEN_P = [-3, -4, -6];                                                    // 1./2./3. Zeitstrafe
+// Skala 50–100: (Punkte − MIN) × 50 / (MAX − MIN) + 50, MIN/MAX = Median der schwächsten/besten 1 % je Position
+const ROLES = { RR: { n: 'Rückraum', k: 'Rück', min: 61, max: 179 }, AU: { n: 'Außen', k: 'Außen', min: 72, max: 166 }, KM: { n: 'Kreis', k: 'Kreis', min: 67, max: 159 } };
+
+const uid = () => Math.random().toString(36).slice(2, 10);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pct = (a, b) => b ? Math.round(a / b * 100) + '%' : '–';
+const fmt = ms => { ms = Math.max(0, ms); const s = Math.floor(ms / 1000); return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); };
+const fmtShort = ms => { const s = Math.ceil(Math.max(0, ms) / 1000); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+const vib = n => { try { navigator.userActivation?.hasBeenActive && navigator.vibrate && navigator.vibrate(n); } catch (e) {} };
+
+function defaultPlayers() { return [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14].map(nr => ({ id: uid(), nr, name: '' })); }
+function newGame(opponent) { return { id: uid(), opponent: opponent || 'Gegner', date: new Date().toISOString(), clock: 0, runStart: null, half: 1, events: [] }; }
+function defaultState() { return { team: { name: 'Wir', players: defaultPlayers() }, settings: { halfMin: 25 }, game: newGame(), history: [] }; }
+function load() {
+  let s = null;
+  try { s = JSON.parse(localStorage.getItem(LS_KEY)); } catch (e) {}
+  return fixState(s && s.team && s.game ? s : defaultState());
+}
+function fixState(s) { s.history ||= []; s.settings ||= { halfMin: 25 }; delete s.settings.w; return s; }
+let S = load();
+function save() { try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch (e) { toast('Speichern fehlgeschlagen!'); } }
+
+const UI = { tab: 'live', sheet: null, pos: null, half: 0, viewId: null };
+
+/* ---------- Uhr ---------- */
+const halfMs = () => S.settings.halfMin * 60000;
+const running = () => !!S.game.runStart;
+const clockNow = () => S.game.clock + (S.game.runStart ? Date.now() - S.game.runStart : 0);
+function startStop() {
+  const g = S.game;
+  if (g.runStart) { g.clock = clockNow(); g.runStart = null; }
+  else {
+    if (g.half === 1 && g.clock >= halfMs()) g.half = 2;
+    if (g.clock >= halfMs() * 2) { toast('Spielzeit ist abgelaufen'); return; }
+    g.runStart = Date.now(); wake();
+  }
+  save(); render();
+}
+function stopClock() { const g = S.game; if (g.runStart) { g.clock = clockNow(); g.runStart = null; } }
+function editClock() {
+  const v = prompt('Spielzeit einstellen (mm:ss)', fmt(clockNow()));
+  if (!v) return;
+  const m = v.trim().match(/^(\d{1,3})(?::(\d{1,2}))?$/);
+  if (!m) { alert('Format: mm:ss, z. B. 23:15'); return; }
+  const ms = (parseInt(m[1]) * 60 + parseInt(m[2] || 0)) * 1000, g = S.game;
+  g.clock = Math.min(ms, halfMs() * 2);
+  if (g.runStart) g.runStart = Date.now();
+  g.half = g.clock > halfMs() || (g.clock === halfMs() && g.half === 2) ? 2 : 1;
+  save(); render();
+}
+function tick() {
+  const g = S.game;
+  if (g.runStart && clockNow() >= halfMs() * g.half) {
+    g.clock = halfMs() * g.half; g.runStart = null; save(); vib([300, 150, 300]);
+    toast(g.half === 1 ? 'Halbzeit!' : 'Spielende!'); render(); return;
+  }
+  const c = document.getElementById('clk');
+  if (c) c.firstChild.nodeValue = fmt(clockNow());
+  renderPens();
+  if (UI.tab === 'live' && !UI.sheet && running()) refreshTiles();
+}
+setInterval(tick, 500);
+
+/* ---------- Bildschirm bleibt an ---------- */
+let wl = null;
+async function wake() { try { if (!wl && 'wakeLock' in navigator) { wl = await navigator.wakeLock.request('screen'); wl.addEventListener('release', () => { wl = null; }); } } catch (e) {} }
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { wake(); render(); } });
+
+/* ---------- Daten ---------- */
+const roster = g => (g && g.roster) || S.team.players;
+const sorted = list => [...list].sort((a, b) => (a.nr === '' ? 999 : a.nr) - (b.nr === '' ? 999 : b.nr));
+const player = (pid, g) => roster(g).find(p => p.id === pid);
+function pname(pid, g, short) {
+  const p = player(pid, g); if (!p) return '(gelöscht)';
+  return '#' + p.nr + (p.name ? ' ' + (short ? p.name.split(' ')[0] : p.name) : '');
+}
+const Z = () => ({ g: 0, m: 0, g7: 0, m7: 0, tf: 0, bg: 0, blk: 0, derr: 0, c7m: 0, pen: 0, yel: 0, red: 0, as: 0, ofd: 0, pa: 0, pd: 0 });
+function calc(evs) {
+  const p = {}, t = Z(); t.to = 0;
+  const pos = {}; POS.forEach(([k]) => pos[k] = { g: 0, a: 0 });
+  for (const e of evs) {
+    if (e.type === 'TO') { t.to++; continue; }
+    const x = e.pid ? (p[e.pid] ||= Z()) : Z(), ps = e.pos && pos[e.pos], is7 = e.pos === '7m';
+    const inc = k => { x[k]++; t[k]++; }, sp = SHOT_P[e.pos] || SHOT_P[''];
+    switch (e.type) {
+      case 'GOAL': inc('g'); if (is7) inc('g7'); if (ps) { ps.g++; ps.a++; } x.pa += sp[0]; break;
+      case 'MISS': inc('m'); if (is7) inc('m7'); if (ps) ps.a++; x.pa += sp[1]; break;
+      case 'AST': inc('as'); x.pa += AST_P[e.pos] ?? AST_P['']; break;
+      case 'TF': inc('tf'); x.pa += EV_P.TF; break;
+      case 'OFD': inc('ofd'); x.pd += EV_P.OFD; break;
+      case 'BG': inc('bg'); x.pd += EV_P.BG; break;
+      case 'BLK': inc('blk'); x.pd += EV_P.BLK; break;
+      case 'DERR': inc('derr'); x.pd += EV_P.DERR; break;
+      case 'C7M': inc('c7m'); x.pd += EV_P.C7M; break;
+      case 'PEN': x.pd += PEN_P[Math.min(x.pen, 2)]; inc('pen'); break;
+      case 'YEL': inc('yel'); x.pd += EV_P.YEL; break;
+      case 'RED': inc('red'); x.pd += EV_P.RED; break;
+    }
+  }
+  return { p, t, pos };
+}
+const qcls = (g, a) => a < 3 ? '' : g / a >= .6 ? 'q-g' : g / a >= .4 ? 'q-o' : 'q-r';
+const attErr = s => s.m + s.tf;                 // Fehler im Angriff
+const defPlus = s => s.bg + s.blk + s.ofd;              // positive Abwehraktionen
+const defMinus = s => s.derr + s.c7m + s.pen;   // negative Abwehraktionen
+const role = p => (p && ROLES[p.role]) ? p.role : 'RR';
+const hpiPts = s => 100 + s.pa + s.pd;
+const hpi = (s, p) => { const r = ROLES[role(p)]; return Math.max(0, Math.min(100, Math.round((hpiPts(s) - r.min) * 50 / (r.max - r.min) + 50))); };
+const fmtH = v => String(v);
+const hcls = v => v >= 75 ? 'q-g' : v < 60 ? 'q-r' : '';
+const fmtP = v => (v > 0 ? '+' : v < 0 ? '−' : '±') + Math.abs(v);
+const pcls = v => v > 0 ? 'q-g' : v < 0 ? 'q-r' : 'mut';
+// Rangliste aller Spieler mit mindestens einer Aktion (höchster HPI zuerst)
+function ranking(c, g) {
+  return sorted(roster(g)).filter(p => c.p[p.id]).map(p => ({ p, s: c.p[p.id], v: hpi(c.p[p.id], p) }))
+    .sort((a, b) => b.v - a.v || hpiPts(b.s) - hpiPts(a.s));
+}
+function topFlop(rk) { return { top: rk.slice(0, 3), flop: rk.slice(3).slice(-3).reverse() }; }
+function rankRow(r, i) {
+  return `<div class="rk"><span class="i">${i + 1}.</span><b>#${esc(r.p.nr)}</b><span class="n">${esc(r.p.name)}</span><span class="v ${hcls(r.v)}">${fmtH(r.v)}</span></div>`;
+}
+function topFlopHtml(c) {
+  const { top, flop } = topFlop(ranking(c));
+  if (!top.length && !flop.length) return '';
+  return `<div class="tf"><div><h5 class="q-g">▲ Top 3 HPI</h5>${top.map(rankRow).join('') || '<div class="mut sm">–</div>'}</div>
+    <div><h5 class="q-r">▼ Flop 3 HPI</h5>${flop.map(rankRow).join('') || '<div class="mut sm">–</div>'}</div></div>`;
+}
+
+function activePens() {
+  const now = clockNow(), out = [];
+  for (const e of S.game.events) {
+    if (e.type !== 'PEN' && e.type !== 'RED') continue;
+    const rest = PEN_MS - (now - e.t);
+    if (rest > 0 && e.t <= now) out.push({ e, rest });
+  }
+  return out;
+}
+
+/* ---------- Events ---------- */
+function add(type, pid, pos) {
+  S.game.events.push({ id: uid(), t: clockNow(), h: S.game.half, type, pid: pid || null, pos: pos || null });
+  if (type === 'TO') stopClock();
+  save(); vib(25); closeSheet();
+  toast((pid ? pname(pid, null, true) + ' – ' : '') + LBL[type] + (pos ? ' (' + pos + ')' : ''), true);
+  render();
+}
+function undo() { const e = S.game.events.pop(); if (!e) return; save(); vib(15); toast('Gelöscht: ' + LBL[e.type]); render(); }
+function delEvent(id) {
+  const i = S.game.events.findIndex(e => e.id === id); if (i < 0 || !confirm('Eintrag löschen?')) return;
+  S.game.events.splice(i, 1); save(); render();
+}
+
+/* ---------- Toast ---------- */
+let toastT = null;
+function toast(msg, withUndo) {
+  const t = document.getElementById('toast');
+  t.querySelector('span').textContent = msg;
+  t.querySelector('button').style.display = withUndo ? '' : 'none';
+  t.classList.add('show'); clearTimeout(toastT);
+  toastT = setTimeout(() => t.classList.remove('show'), withUndo ? 3500 : 2200);
+}
+
+/* ---------- Header ---------- */
+function renderHeader() {
+  const g = S.game, run = running(), to = g.events.filter(e => e.type === 'TO').length;
+  const full = g.clock >= halfMs() * 2 && !run, h1Done = g.half === 1 && g.clock >= halfMs() && !run;
+  const ssTxt = run ? '❚❚ Stopp' : full ? 'Spielende' : h1Done ? '▶ 2. HZ starten' : g.clock === 0 ? '▶ Anpfiff' : '▶ Weiter';
+  document.getElementById('hdr').innerHTML = `
+    <div class="match"><b>${esc(S.team.name)}</b> gegen <b>${esc(g.opponent)}</b></div>
+    <div class="clockrow">
+      <button id="clk" class="clock ${run ? 'run' : ''}" data-act="clock">${fmt(clockNow())}<small>${g.half}. Halbzeit</small></button>
+      <button class="ss ${run ? 'run' : ''}" data-act="ss">${ssTxt}</button>
+      <button class="to" data-act="to">Auszeit<small>${to}/3</small></button>
+    </div>
+    <div id="pens" class="pens"></div>`;
+  renderPens();
+}
+function renderPens() {
+  const el = document.getElementById('pens'); if (!el) return;
+  const ps = activePens();
+  el.innerHTML = ps.length ? `<span class="chip str">Unterzahl: ${Math.max(0, 6 - ps.length)} Feldspieler</span>` +
+    ps.map(x => `<span class="chip">${esc(pname(x.e.pid, null, true))} ${fmtShort(x.rest)}</span>`).join('') : '';
+}
+
+/* ---------- Live ---------- */
+function kpiHtml() {
+  const t = calc(S.game.events).t, a = t.g + t.m;
+  return `<div class="kgrp"><span>Angriff</span>
+      <div class="kpi"><b class="${qcls(t.g, a)}">${t.g}/${a}</b><small>Wurfquote ${pct(t.g, a)}</small></div>
+      <div class="kpi"><b class="${t.m >= 8 ? 'q-r' : ''}">${t.m}</b><small>Fehlwürfe</small></div>
+      <div class="kpi"><b class="${t.tf >= 8 ? 'q-r' : ''}">${t.tf}</b><small>Techn. Fehler</small></div></div>
+    <div class="kgrp"><span>Abwehr</span>
+      <div class="kpi"><b class="q-g">${t.bg + t.blk}</b><small>Ballgew. + Block</small></div>
+      <div class="kpi"><b class="${t.derr >= 5 ? 'q-r' : ''}">${t.derr}</b><small>Fehler → Tor</small></div>
+      <div class="kpi"><b>${t.c7m} / ${t.pen}</b><small>7m / 2 Min</small></div></div>`;
+}
+function tileHtml(p, c, pens) {
+  const s = c.p[p.id] || Z(), a = s.g + s.m, dq = s.red > 0 || s.pen >= 3;
+  const pen = pens.find(x => x.e.pid === p.id);
+  const marks = (s.yel ? '🟨' : '') + (s.pen ? "2'" + (s.pen > 1 ? '×' + s.pen : '') : '') + (dq ? ' DQ' : '');
+  const att = `<i>ANG</i><span class="${a ? qcls(s.g, a) : 'mut'}">${s.g}/${a}</span>${s.as ? ` · <span class="q-g">As ${s.as}</span>` : ''}${s.tf ? ` · <span class="${s.tf >= 2 ? 'q-o' : ''}">TF ${s.tf}</span>` : ''}`;
+  const dp = defPlus(s), dm = defMinus(s);
+  const def = `<i>ABW</i>${dp || dm ? `<span class="q-g">+${dp}</span> <span class="${dm ? 'q-r' : 'mut'}">−${dm}</span>` : '<span class="mut">–</span>'}`;
+  return `<button class="tile ${pen ? 'out' : ''} ${dq ? 'dq' : ''}" data-act="player" data-v="${p.id}">
+    ${marks ? `<span class="pd">${marks}</span>` : ''}
+    <div class="nr">${esc(p.nr)}${c.p[p.id] ? `<span class="hp ${hcls(hpi(s, p))}">HPI ${hpi(s, p)}</span>` : ''}</div><div class="nm">${esc(p.name || '–')}</div>
+    <div class="ln">${att}</div><div class="ln">${def}</div>${pen ? `<span class="cd">2' ${fmtShort(pen.rest)}</span>` : ''}</button>`;
+}
+function renderLive() {
+  const g = S.game, c = calc(g.events), pens = activePens();
+  if (!S.team.players.length) return '<div class="empty">Noch keine Spieler im Kader.<br>Unter „Team“ anlegen.</div>';
+  return `<div id="kpis">${kpiHtml()}</div>
+    ${topFlopHtml(c)}
+    <div class="grid" id="tiles">${sorted(S.team.players).map(p => tileHtml(p, c, pens)).join('')}</div>
+    <button class="undo" data-act="undo">↶ Letzten Eintrag rückgängig${g.events.length ? ' (' + esc(LBL[g.events[g.events.length - 1].type]) + ')' : ''}</button>`;
+}
+let lastPenKey = '';
+function refreshTiles() {
+  // Kacheln nur neu zeichnen, wenn eine Zeitstrafe läuft (Countdown) oder gerade abgelaufen ist
+  const pens = activePens(), key = pens.map(x => x.e.id + Math.ceil(x.rest / 1000)).join();
+  if (key === lastPenKey) return; lastPenKey = key;
+  const el = document.getElementById('tiles'); if (!el) return;
+  const c = calc(S.game.events);
+  el.innerHTML = sorted(S.team.players).map(p => tileHtml(p, c, pens)).join('');
+}
+
+/* ---------- Statistik ---------- */
+function viewGame() { return UI.viewId ? S.history.find(h => h.id === UI.viewId) || S.game : S.game; }
+function renderStats() {
+  const g = viewGame(), isLive = g === S.game;
+  const evs = UI.half ? g.events.filter(e => e.h === UI.half) : g.events;
+  const c = calc(evs), t = c.t, a = t.g + t.m;
+  const pl = sorted(roster(g)).filter(p => c.p[p.id]);
+  const rk = ranking(c, g);
+  const attP = pl.filter(p => { const s = c.p[p.id]; return s.g + s.m + s.tf + s.as; });
+  const defP = pl.filter(p => { const s = c.p[p.id]; return defPlus(s) + defMinus(s) + s.yel + s.red; });
+  const hm = g.halfMin || S.settings.halfMin, blocks = [];
+  for (let m = 0; m < hm * 2; m += 5) {
+    const last = m + 5 >= hm * 2;
+    const be = calc(g.events.filter(e => e.t >= m * 60000 && (e.t < (m + 5) * 60000 || last))).t;
+    blocks.push([m, be.g, attErr(be) + be.derr]);
+  }
+  const maxB = Math.max(1, ...blocks.map(b => Math.max(b[1], b[2])));
+  return `
+    ${!isLive ? `<div class="banner"><div>Archiv: <b>gegen ${esc(g.opponent)}</b><br><small>${new Date(g.date).toLocaleDateString('de-DE')}</small></div><button data-act="share" data-v="${g.id}">Teilen</button><button data-act="live">Zurück</button></div>` : ''}
+    <div class="seg">${['Gesamt', '1. HZ', '2. HZ'].map((l, i) => `<button class="${UI.half === i ? 'on' : ''}" data-act="half" data-v="${i}">${l}</button>`).join('')}</div>
+    <div class="card"><h4>Mannschaft – Angriff</h4><div class="stats">
+      <div><b class="${qcls(t.g, a)}">${t.g}/${a}</b><small>Tore/Würfe ${pct(t.g, a)}</small></div>
+      <div><b>${t.m}</b><small>Fehlwürfe</small></div>
+      <div><b>${t.tf}</b><small>Techn. Fehler</small></div>
+      <div><b>${t.g7}/${t.g7 + t.m7}</b><small>7m ${pct(t.g7, t.g7 + t.m7)}</small></div>
+      <div><b class="q-g">${t.as}</b><small>Assists</small></div>
+      <div><b>${pct(t.g, a + t.tf)}</b><small>Effizienz (T/Würfe+TF)</small></div>
+    </div></div>
+    <div class="card"><h4>Mannschaft – Abwehr</h4><div class="stats">
+      <div><b class="q-g">${t.bg}</b><small>Ballgewinne</small></div>
+      <div><b class="q-g">${t.blk}</b><small>Blocks</small></div>
+      <div><b class="q-g">${t.ofd}</b><small>Stürmerfouls herausg.</small></div>
+      <div><b class="q-r">${t.derr}</b><small>Fehler → Gegentor</small></div>
+      <div><b>${t.c7m}</b><small>7m verursacht</small></div>
+      <div><b>${t.pen}</b><small>2 Minuten</small></div>
+
+    </div></div>
+    <div class="card"><h4>HPI-Rangliste</h4>${rk.length ? `<table>
+      <tr><th>#</th><th>Spieler</th><th>Pos</th><th>HPI</th><th>Pkt</th><th>Angr.</th><th>Abw.</th></tr>
+      ${rk.map((r, i) => `<tr class="${i < 3 ? 'top' : i >= Math.max(3, rk.length - 3) ? 'flop' : ''}" data-act="chart" data-v="${r.p.id}"><td>${i + 1}.</td><td class="nmc"><b>${esc(r.p.nr)}</b> ${esc(r.p.name)}</td><td class="mut">${ROLES[role(r.p)].k}</td><td class="${hcls(r.v)}"><b>${r.v}</b></td><td>${hpiPts(r.s)}</td><td class="${pcls(r.s.pa)}">${fmtP(r.s.pa)}</td><td class="${pcls(r.s.pd)}">${fmtP(r.s.pd)}</td></tr>`).join('')}
+    </table><div class="mut sm" style="margin-top:6px">Auf einen Spieler tippen → HPI-Verlauf über alle Spieltage. Berechnung wie HBL (Team › HPI).</div>` : '<div class="empty">Noch keine Einträge</div>'}</div>
+    <div class="card"><h4>Angriff pro Spieler</h4>${attP.length ? `<table>
+      <tr><th>Nr</th><th>Name</th><th>T/W</th><th>%</th><th>Fehlw.</th><th>As</th><th>TF</th><th>7m</th></tr>
+      ${attP.map(p => { const s = c.p[p.id], a = s.g + s.m; return `<tr><td><b>${esc(p.nr)}</b></td><td class="nmc">${esc(p.name)}</td><td>${s.g}/${a}</td><td class="${qcls(s.g, a)}">${pct(s.g, a)}</td><td class="${s.m >= 3 ? 'q-r' : ''}">${s.m || ''}</td><td class="q-g">${s.as || ''}</td><td class="${s.tf >= 3 ? 'q-r' : ''}">${s.tf || ''}</td><td>${s.g7 + s.m7 ? s.g7 + '/' + (s.g7 + s.m7) : ''}</td></tr>`; }).join('')}
+    </table>` : '<div class="empty">Noch keine Einträge</div>'}</div>
+    <div class="card"><h4>Abwehr pro Spieler</h4>${defP.length ? `<table>
+      <tr><th>Nr</th><th>Name</th><th>BG</th><th>Blk</th><th>StF</th><th>F→T</th><th>7m</th><th>2'</th></tr>
+      ${defP.map(p => { const s = c.p[p.id]; return `<tr><td><b>${esc(p.nr)}</b></td><td class="nmc">${esc(p.name)}</td><td class="q-g">${s.bg || ''}</td><td class="q-g">${s.blk || ''}</td><td class="q-g">${s.ofd || ''}</td><td class="${s.derr ? 'q-r' : ''}">${s.derr || ''}</td><td>${s.c7m || ''}</td><td>${s.pen || ''}${s.yel ? '🟨' : ''}${s.red ? '🟥' : ''}</td></tr>`; }).join('')}
+    </table>` : '<div class="empty">Noch keine Einträge</div>'}</div>
+    <div class="card"><h4>Würfe nach Position</h4><table>
+      <tr><th>Pos</th><th></th><th>T/W</th><th>%</th></tr>
+      ${POS.map(([k, n]) => { const p = c.pos[k]; return `<tr><td><b>${k}</b></td><td class="nmc mut">${n}</td><td>${p.g}/${p.a}</td><td class="${qcls(p.g, p.a)}">${pct(p.g, p.a)}</td></tr>`; }).join('')}
+    </table></div>
+    <div class="card"><h4>Verlauf (5-Min-Abschnitte)</h4>
+      <div class="legend"><span class="dot" style="background:var(--gr)"></span>Tore &nbsp; <span class="dot" style="background:var(--rd)"></span>Fehler (Fehlwurf, TF, Abwehrfehler)</div>
+      ${blocks.map(([m, x, y]) => `<div class="tl"><span class="mut">${m}–${m + 5}'</span><div class="bar a" style="width:${x / maxB * 100}%"></div><span class="r">${x}:${y}</span><div class="bar b" style="width:${y / maxB * 100}%"></div></div>`).join('')}
+    </div>`;
+}
+
+/* ---------- Verlauf ---------- */
+function renderLog() {
+  const rows = [...S.game.events].reverse();
+  if (!rows.length) return '<div class="empty">Noch keine Einträge.<br>Im Live-Tab auf einen Spieler tippen.</div>';
+  return rows.map(e => `<div class="ev"><span class="t">${fmt(e.t)}</span>
+    <span class="d"><span class="dot" style="background:${COL[e.type] || 'var(--mut)'}"></span>${esc(LBL[e.type] || e.type)}${e.pos ? ' <span class="mut">(' + e.pos + ')</span>' : ''}${e.pid ? ' · ' + esc(pname(e.pid)) : ''}</span>
+    <button data-act="del" data-v="${e.id}">✕</button></div>`).join('');
+}
+
+/* ---------- Team ---------- */
+function renderTeam() {
+  const pl = sorted(S.team.players);
+  return `
+    <div class="card"><h4>Spiel</h4>
+      <label class="field"><span>Eigene Mannschaft</span><input class="inp" data-f="teamname" value="${esc(S.team.name)}"></label>
+      <label class="field"><span>Gegner</span><input class="inp" data-f="opp" value="${esc(S.game.opponent)}"></label>
+      <label class="field"><span>Halbzeitlänge (Minuten)</span><input class="inp" type="number" inputmode="numeric" data-f="halfmin" value="${S.settings.halfMin}"></label>
+      <button class="btn b-bl" data-act="share" data-v="live">📤 Spielbericht teilen</button>
+      <button class="btn" data-act="newgame">🏁 Spiel abschließen & neues Spiel</button>
+    </div>
+    <div class="card"><h4>Feldspieler (${pl.length})</h4>
+      ${pl.map(p => `<div class="row"><input class="n" type="number" inputmode="numeric" data-f="nr" data-v="${p.id}" value="${esc(p.nr)}"><input class="f" type="text" placeholder="Name" data-f="name" data-v="${p.id}" value="${esc(p.name)}"><select data-f="role" data-v="${p.id}">${Object.entries(ROLES).map(([k, r]) => `<option value="${k}" ${role(p) === k ? 'selected' : ''}>${r.n}</option>`).join('')}</select><button class="xbtn" data-act="delp" data-v="${p.id}">✕</button></div>`).join('')}
+      <button class="btn" data-act="addp">+ Spieler hinzufügen</button>
+    </div>
+    <div class="card"><h4>HPI – Berechnung wie HBL</h4>
+      <p class="mut sm" style="margin:0 0 8px">Jeder Spieler startet mit 100 Punkten. Aktionen geben Plus- oder Minuspunkte. Daraus wird je nach Position (oben im Kader einstellen) der HPI auf einer Skala von 50 bis 100 berechnet.</p>
+      <table><tr><th>Wurf</th><th></th><th>Tor</th><th>Fehlw.</th><th>Assist</th></tr>
+        <tr><td>LA / RA</td><td class="mut">Außen</td><td class="q-g">+7</td><td class="q-r">−7</td><td class="q-g">+3</td></tr>
+        <tr><td>RL/RM/RR</td><td class="mut">9 m</td><td class="q-g">+10</td><td class="q-r">−4</td><td>0</td></tr>
+        <tr><td>KM</td><td class="mut">Kreis</td><td class="q-g">+6</td><td class="q-r">−7</td><td class="q-g">+4</td></tr>
+        <tr><td>GS</td><td class="mut">Gegenstoß</td><td class="q-g">+5</td><td class="q-r">−8</td><td class="q-g">+5</td></tr>
+        <tr><td>7m</td><td class="mut">Strafwurf</td><td class="q-g">+6</td><td class="q-r">−8</td><td class="q-g">+4</td></tr>
+        <tr><td>ohne Pos.</td><td class="mut">Rückraum allg.</td><td class="q-g">+7</td><td class="q-r">−6</td><td class="q-g">+3</td></tr></table>
+      <p class="mut sm" style="margin:6px 0 0">Assist: Position = wo das Tor erzielt wurde. Assist mit „7m“ = 7m herausgeholt.</p>
+      <table style="margin-top:8px"><tr><th>Aktion</th><th></th><th>Punkte</th></tr>
+        <tr><td>Ballgewinn</td><td></td><td class="q-g">+8</td></tr><tr><td>Block</td><td></td><td class="q-g">+7</td></tr>
+        <tr><td>Stürmerfoul herausgeholt</td><td></td><td class="q-g">+8</td></tr>
+        <tr><td>Techn. Fehler</td><td></td><td class="q-r">−6</td></tr><tr><td>7m verursacht</td><td></td><td class="q-r">−3</td></tr>
+        <tr><td>2 Minuten</td><td class="mut">1./2./3.</td><td class="q-r">−3/−4/−6</td></tr><tr><td>Rote Karte</td><td></td><td class="q-r">−12</td></tr>
+        <tr><td>Fehler → Gegentor</td><td class="mut">nicht im HBL-HPI</td><td>0</td></tr></table>
+      <p class="mut sm" style="margin:8px 0 0">HPI = (Punkte − MIN) × 50 / (MAX − MIN) + 50, max. 100.<br>Rückraum 61–179 · Außen 72–166 · Kreis 67–159</p>
+    </div>
+    <div class="card"><h4>Vergangene Spiele</h4>
+      ${S.history.length ? S.history.map(h => `<div class="hist"><div><b>${esc(h.opponent)}</b><br><small>${new Date(h.date).toLocaleDateString('de-DE')}</small></div><button data-act="view" data-v="${h.id}">Ansehen</button><button data-act="share" data-v="${h.id}">Teilen</button><button data-act="delh" data-v="${h.id}">✕</button></div>`).join('') : '<div class="empty">Noch keine abgeschlossenen Spiele</div>'}
+    </div>
+    <div class="card"><h4>Daten</h4>
+      <button class="btn" data-act="export">💾 Backup exportieren</button>
+      <button class="btn" data-act="import">📂 Backup importieren</button>
+      <p class="mut" style="font-size:12px;margin:10px 0 0">Alle Daten liegen nur auf diesem Handy (kein Internet nötig). Tipp: nach jedem Spieltag ein Backup machen.</p>
+    </div>`;
+}
+
+/* ---------- Spieler-Auswahl (Sheet) ---------- */
+function openSheet(pid) { UI.sheet = { pid }; UI.pos = null; document.getElementById('toast').classList.remove('show'); renderSheet(); }
+function closeSheet() { UI.sheet = null; document.getElementById('sheet').innerHTML = ''; }
+function renderSheet() {
+  const el = document.getElementById('sheet');
+  if (!UI.sheet) { el.innerHTML = ''; return; }
+  if (UI.sheet.chart) { el.innerHTML = `<div class="sheetbg" data-act="bg"><div class="sheet">${chartHtml(UI.sheet.chart)}<button class="cancel" data-act="close">Schließen</button></div></div>`; return; }
+  const p = player(UI.sheet.pid); if (!p) return closeSheet();
+  const s = calc(S.game.events).p[p.id] || Z();
+  el.innerHTML = `<div class="sheetbg" data-act="bg"><div class="sheet">
+    <h3>#${esc(p.nr)} ${esc(p.name)}<small>${s.g}/${s.g + s.m} · TF ${s.tf} · HPI ${hpi(s, p)}</small></h3>
+    <div class="lbl">Angriff</div>
+    <div class="poss" style="margin-bottom:8px">${POS.map(([k]) => `<button class="${UI.pos === k ? 'on' : ''}" data-act="pos" data-v="${k}">${k}</button>`).join('')}</div>
+    <div class="acts two">
+      <button class="b-gr" data-act="ev" data-v="GOAL">⚽ Tor</button>
+      <button class="b-rd" data-act="ev" data-v="MISS">✕ Fehlwurf</button>
+      <button class="b-gr2" data-act="ev" data-v="AST">🤝 Assist</button>
+      <button class="b-or" data-act="ev" data-v="TF">Techn. Fehler</button>
+    </div>
+    <div class="lbl sm">Position optional – vor Tor/Fehlwurf/Assist antippen (beim Assist: wo das Tor fiel)</div>
+    <div class="lbl">Abwehr</div>
+    <div class="acts">
+      <button class="b-bl" data-act="ev" data-v="BG">Ballgewinn</button>
+      <button class="b-cy" data-act="ev" data-v="BLK">Block</button>
+      <button class="b-cy" data-act="ev" data-v="OFD">Stürmerfoul heraus&shy;geholt</button>
+    </div>
+    <div class="acts" style="margin-top:8px">
+      <button class="b-rd" data-act="ev" data-v="DERR">Fehler → Gegentor</button>
+      <button data-act="ev" data-v="C7M">7m verursacht</button>
+      <button data-act="ev" data-v="PEN">⏱ 2 Min</button>
+    </div>
+    <div class="acts two small" style="margin-top:8px">
+      <button class="b-yl" data-act="ev" data-v="YEL">Gelbe Karte</button>
+      <button data-act="ev" data-v="RED">🟥 Rote Karte</button>
+    </div>
+    <button class="cancel" data-act="chart" data-v="${p.id}">📈 HPI-Verlauf</button>
+    <button class="cancel" data-act="close">Abbrechen</button></div></div>`;
+}
+/* ---------- HPI-Verlauf über die Spieltage ---------- */
+function chartHtml(pid) {
+  const p = player(pid) || S.history.map(h => player(pid, h)).find(Boolean);
+  const games = [...S.history].reverse(); if (S.game.events.length) games.push(S.game);
+  const pts = [];
+  games.forEach((g, i) => { const s = calc(g.events).p[pid]; if (s) pts.push({ x: i + 1, v: hpi(s, player(pid, g) || p), g }); });
+  const head = `<h3>HPI-Verlauf<small>#${esc(p ? p.nr : '?')} ${esc(p ? p.name : '')} · ${p ? ROLES[role(p)].n : ''}</small></h3>`;
+  if (!pts.length) return head + '<div class="empty">Noch keine Werte</div>';
+  const W = 340, H = 210, L = 30, R = 10, T = 14, B = 26, n = Math.max(games.length, 5);
+  const lo = Math.min(50, Math.floor(Math.min(...pts.map(q => q.v)) / 10) * 10), hi = 100;
+  const X = x => L + (x - 1) * (W - L - R) / Math.max(1, n - 1), Y = v => T + (hi - v) * (H - T - B) / (hi - lo);
+  let svg = '';
+  for (let v = lo; v <= hi; v += 10) svg += `<line x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}" class="gl"/><text x="${L - 5}" y="${Y(v) + 4}" text-anchor="end">${v}</text>`;
+  for (let x = 1; x <= n; x++) svg += `<text x="${X(x)}" y="${H - 8}" text-anchor="middle">${x}</text>`;
+  svg += `<polyline points="${pts.map(q => X(q.x) + ',' + Y(q.v)).join(' ')}" class="ln"/>`;
+  svg += pts.map(q => `<circle cx="${X(q.x)}" cy="${Y(q.v)}" r="4.5"/><text x="${X(q.x)}" y="${Y(q.v) - 9}" text-anchor="middle" class="vl">${q.v}</text>`).join('');
+  const avg = Math.round(pts.reduce((a, q) => a + q.v, 0) / pts.length);
+  return head + `<svg class="chart" viewBox="0 0 ${W} ${H}">${svg}</svg>
+    <div class="mut sm" style="text-align:center;margin-bottom:8px">Spieltag · Ø HPI ${avg} aus ${pts.length} Spiel${pts.length > 1 ? 'en' : ''}</div>
+    ${pts.slice().reverse().map(q => `<div class="rk"><span class="i">${q.x}.</span><span class="n" style="color:var(--tx)">${q.g === S.game ? 'aktuell: ' : ''}gegen ${esc(q.g.opponent)} <span class="mut">${new Date(q.g.date).toLocaleDateString('de-DE')}</span></span><span class="v ${hcls(q.v)}">${q.v}</span></div>`).join('')}`;
+}
+
+/* ---------- Bericht / Backup ---------- */
+function report(g) {
+  const c = calc(g.events), t = c.t, a = t.g + t.m;
+  const L = [`🤾 ${g.teamName || S.team.name} gegen ${g.opponent} – Feldspieler-Statistik`, new Date(g.date).toLocaleDateString('de-DE'), '',
+    'ANGRIFF', `Tore/Würfe: ${t.g}/${a} (${pct(t.g, a)}) · 7m: ${t.g7}/${t.g7 + t.m7}`, `Assists: ${t.as} · Fehlwürfe: ${t.m} · Techn. Fehler: ${t.tf}`, '',
+    'ABWEHR', `Ballgewinne: ${t.bg} · Blocks: ${t.blk} · Stürmerfouls herausgeholt: ${t.ofd}`, `Fehler → Gegentor: ${t.derr} · 7m verursacht: ${t.c7m} · 2 Min: ${t.pen}`, ''];
+  const { top, flop } = topFlop(ranking(c, g)), line = r => `#${r.p.nr} ${r.p.name} (${fmtH(r.v)})`;
+  if (top.length || flop.length) L.push('HPI TOP 3: ' + (top.map(line).join(', ') || '–'), 'HPI FLOP 3: ' + (flop.map(line).join(', ') || '–'), '');
+  L.push('SPIELER');
+  for (const p of sorted(roster(g))) {
+    const s = c.p[p.id]; if (!s) continue;
+    const parts = [];
+    if (s.g + s.m) parts.push(`${s.g}/${s.g + s.m} (${pct(s.g, s.g + s.m)})`);
+    if (s.m) parts.push(`FW ${s.m}`); if (s.as) parts.push(`As ${s.as}`); if (s.tf) parts.push(`TF ${s.tf}`);
+    if (s.bg) parts.push(`BG ${s.bg}`); if (s.blk) parts.push(`Block ${s.blk}`); if (s.ofd) parts.push(`StF ${s.ofd}`);
+    if (s.derr) parts.push(`F→T ${s.derr}`); if (s.c7m) parts.push(`7m-verurs. ${s.c7m}`); if (s.pen) parts.push(`2' ${s.pen}`);
+    if (parts.length) L.push(`#${p.nr} ${p.name}: HPI ${hpi(s, p)} | ${parts.join(' · ')}`);
+  }
+  return L.join('\n');
+}
+async function share(id) {
+  const g = id === 'live' ? S.game : S.history.find(h => h.id === id) || S.game, txt = report(g);
+  try { if (navigator.share) { await navigator.share({ text: txt }); return; } } catch (e) { if (e.name === 'AbortError') return; }
+  try { await navigator.clipboard.writeText(txt); toast('Bericht kopiert'); } catch (e) { prompt('Bericht kopieren:', txt); }
+}
+function exportData() {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(S, null, 1)], { type: 'application/json' }));
+  a.download = 'handball-stats-' + new Date().toISOString().slice(0, 10) + '.json'; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+function importData() {
+  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'application/json,.json';
+  inp.onchange = async () => {
+    try {
+      const s = JSON.parse(await inp.files[0].text()); if (!s.team || !s.game) throw new Error();
+      if (!confirm('Aktuelle Daten durch das Backup ersetzen?')) return;
+      S = fixState(s); save(); render(); toast('Backup geladen');
+    } catch (e) { alert('Datei ist kein gültiges Backup.'); }
+  };
+  inp.click();
+}
+
+/* ---------- Render ---------- */
+function render() {
+  renderHeader(); lastPenKey = '';
+  document.getElementById('main').innerHTML = UI.tab === 'live' ? renderLive() : UI.tab === 'stats' ? renderStats() : UI.tab === 'log' ? renderLog() : renderTeam();
+  document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('on', b.dataset.v === UI.tab));
+  renderSheet();
+}
+
+/* ---------- Eingaben ---------- */
+document.addEventListener('click', ev => {
+  wake();
+  const b = ev.target.closest('[data-act]'); if (!b) return;
+  const a = b.dataset.act, v = b.dataset.v;
+  if (a === 'bg' && ev.target !== b) return;
+  switch (a) {
+    case 'tab': UI.tab = v; if (v !== 'stats') UI.viewId = null; window.scrollTo(0, 0); render(); break;
+    case 'ss': startStop(); break;
+    case 'clock': editClock(); break;
+    case 'to': {
+      const n = S.game.events.filter(e => e.type === 'TO').length;
+      if (n >= 3 && !confirm('Bereits 3 Auszeiten genommen. Trotzdem eintragen?')) return;
+      add('TO'); break;
+    }
+    case 'player': openSheet(v); break;
+    case 'pos': UI.pos = UI.pos === v ? null : v; renderSheet(); break;
+    case 'ev': add(v, UI.sheet.pid, (v === 'GOAL' || v === 'MISS' || v === 'AST') ? UI.pos : null); break;
+    case 'bg': case 'close': closeSheet(); break;
+    case 'undo': undo(); document.getElementById('toast').classList.remove('show'); break;
+    case 'del': delEvent(v); break;
+    case 'half': UI.half = +v; render(); break;
+    case 'live': UI.viewId = null; render(); break;
+    case 'view': UI.viewId = v; UI.tab = 'stats'; UI.half = 0; render(); break;
+    case 'share': share(v); break;
+    case 'addp': {
+      const nr = Math.max(0, ...S.team.players.map(p => +p.nr || 0)) + 1;
+      S.team.players.push({ id: uid(), nr, name: '' }); save(); render(); break;
+    }
+    case 'delp': {
+      const p = player(v); if (!confirm(`Spieler #${p.nr} ${p.name} aus dem Kader löschen?`)) return;
+      S.team.players = S.team.players.filter(x => x.id !== v); save(); render(); break;
+    }
+    case 'newgame': {
+      if (running()) { alert('Bitte zuerst die Uhr stoppen.'); return; }
+      if (!confirm('Aktuelles Spiel abschließen und ins Archiv legen?')) return;
+      if (S.game.events.length) S.history.unshift({ ...S.game, runStart: null, roster: JSON.parse(JSON.stringify(S.team.players)), teamName: S.team.name, halfMin: S.settings.halfMin });
+      S.game = newGame(); save(); render(); toast('Neues Spiel angelegt'); break;
+    }
+    case 'delh': if (confirm('Archiviertes Spiel löschen?')) { S.history = S.history.filter(h => h.id !== v); save(); render(); } break;
+    case 'chart': UI.sheet = { chart: v }; document.getElementById('toast').classList.remove('show'); renderSheet(); break;
+    case 'export': exportData(); break;
+    case 'import': importData(); break;
+  }
+});
+document.addEventListener('change', ev => {
+  const el = ev.target, f = el.dataset.f; if (!f) return;
+  const p = el.dataset.v ? player(el.dataset.v) : null;
+  if (f === 'teamname') S.team.name = el.value.trim() || 'Wir';
+  else if (f === 'opp') S.game.opponent = el.value.trim() || 'Gegner';
+  else if (f === 'halfmin') { const n = parseInt(el.value); if (n >= 5 && n <= 45) S.settings.halfMin = n; else el.value = S.settings.halfMin; }
+  else if (f === 'nr' && p) p.nr = el.value === '' ? '' : parseInt(el.value);
+  else if (f === 'name' && p) p.name = el.value.trim();
+  else if (f === 'role' && p) p.role = el.value;
+  save(); renderHeader();
+});
+
+render();
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>
