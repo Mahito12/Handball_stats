@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Handball Feldspieler-Statistik · Version 6 -->
+<!-- Handball Feldspieler-Statistik · Version 9 -->
 <html lang="de">
 <head>
 <meta charset="utf-8">
@@ -51,6 +51,8 @@ main{padding:10px}
 .tile .pd{position:absolute;top:6px;right:8px;font-size:11px;color:var(--or);font-weight:800}
 .tile.out{outline:2px solid var(--or);opacity:.75}
 .tile.dq{opacity:.35}
+.tile.warn{outline:2px solid var(--rd);background:#2a171b}
+.tile .wn{display:block;font-size:11px;color:#fca5a5;font-weight:800;margin-top:3px;line-height:1.2}
 .tile .cd{display:block;font-size:12px;color:var(--or);font-weight:700}
 .q-g{color:var(--gr)}.q-o{color:var(--or)}.q-r{color:var(--rd)}.mut{color:var(--mut)}
 .undo{width:100%;margin-top:12px;padding:12px;background:var(--card);color:var(--mut)}
@@ -145,6 +147,11 @@ tr.top td{background:#0f2a1b}tr.flop td{background:#2e1418}
 .lineup i{display:block;font-style:normal;font-size:11px;margin-top:4px;font-weight:700}
 .lineup .on{background:#123a26;outline:1px solid var(--gr)}.lineup .on i{color:var(--gr)}
 .lineup .off{background:var(--card2);opacity:.45}.lineup .off b{text-decoration:line-through}.lineup .off i{color:var(--mut)}
+.seg.two{grid-template-columns:1fr 1fr}
+.tfsw{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:4px}
+.tfsw button{padding:8px 4px;font-size:12px;font-weight:700;background:var(--card);color:var(--mut)}
+.tfsw button.on{background:var(--card2);color:var(--tx);outline:1px solid var(--or)}
+.tf1{background:var(--card);border-radius:12px;padding:12px;margin-top:6px;text-align:center}
 @media (min-width:600px){.grid{grid-template-columns:repeat(4,1fr)}main{max-width:760px;margin:0 auto}}
 </style>
 </head>
@@ -197,7 +204,9 @@ function fixState(s) { s.history ||= []; s.settings ||= { halfMin: 25 }; delete 
 let S = load();
 function save() { try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch (e) { toast('Speichern fehlgeschlagen!'); } }
 
-const UI = { tab: 'live', sheet: null, pos: null, half: 0, viewId: null };
+const UI = { tab: 'live', sheet: null, pos: null, half: 0, viewId: null, scope: 'game', form: false };
+const FORM_MS = 10 * 60000;   // Formwert: letzte 10 Spielminuten
+let formTick = 0;
 
 /* ---------- Uhr ---------- */
 const halfMs = () => S.settings.halfMin * 60000;
@@ -234,7 +243,10 @@ function tick() {
   const c = document.getElementById('clk');
   if (c) c.firstChild.nodeValue = fmt(clockNow());
   renderPens();
-  if (UI.tab === 'live' && !UI.sheet && running()) refreshTiles();
+  if (UI.tab === 'live' && !UI.sheet && running()) {
+    refreshTiles();
+    if (UI.form && ++formTick % 10 === 0) { const b = document.getElementById('tfbox'); if (b) b.outerHTML = topFlopHtml(calc(S.game.events)); }
+  }
 }
 setInterval(tick, 500);
 
@@ -295,15 +307,25 @@ function ranking(c, g) {
   return sorted(roster(g)).filter(p => c.p[p.id]).map(p => ({ p, s: c.p[p.id], v: hpi(c.p[p.id], p) }))
     .sort((a, b) => b.v - a.v || hpiPts(b.s) - hpiPts(a.s));
 }
-function topFlop(rk) { return { top: rk.slice(0, 3), flop: rk.slice(3).slice(-3).reverse() }; }
+const TOPN = 5;   // Anzahl Spieler in Top/Flop
+// Top = beste Spieler mit Pluspunkten (über 100), Flop = schwächste mit Minuspunkten (unter 100)
+function topFlop(rk) {
+  const top = rk.filter(r => hpiPts(r.s) > 100).slice(0, TOPN);
+  const flop = rk.filter(r => hpiPts(r.s) < 100 && !top.includes(r)).slice(-TOPN).reverse();
+  return { top, flop };
+}
 function rankRow(r, i) {
   return `<div class="rk"><span class="i">${i + 1}.</span><b>#${esc(r.p.nr)}</b><span class="n">${esc(r.p.name)}</span><span class="v ${hcls(r.v)}">${fmtH(r.v)}</span></div>`;
 }
 function topFlopHtml(c) {
-  const { top, flop } = topFlop(ranking(c));
-  if (!top.length && !flop.length) return '';
-  return `<div class="tf"><div><h5 class="q-g">▲ Top 3 HPI</h5>${top.map(rankRow).join('') || '<div class="mut sm">–</div>'}</div>
-    <div><h5 class="q-r">▼ Flop 3 HPI</h5>${flop.map(rankRow).join('') || '<div class="mut sm">–</div>'}</div></div>`;
+  if (!S.game.events.some(e => e.pid)) return '';
+  const now = clockNow();
+  const cc = UI.form ? calc(S.game.events.filter(e => e.t > now - FORM_MS && e.t <= now)) : c;
+  const { top, flop } = topFlop(ranking(cc));
+  const sw = `<div class="tfsw"><button class="${UI.form ? '' : 'on'}" data-act="form" data-v="0">Gesamtes Spiel</button><button class="${UI.form ? 'on' : ''}" data-act="form" data-v="1">🔥 Form: letzte 10 Min</button></div>`;
+  if (!top.length && !flop.length) return `<div id="tfbox">${sw}<div class="tf1 mut sm">Keine Aktionen in den letzten 10 Spielminuten</div></div>`;
+  return `<div id="tfbox">${sw}<div class="tf"><div><h5 class="q-g">▲ Top ${TOPN} ${UI.form ? 'Form' : 'HPI'}</h5>${top.map(rankRow).join('') || '<div class="mut sm">–</div>'}</div>
+    <div><h5 class="q-r">▼ Flop ${TOPN} ${UI.form ? 'Form' : 'HPI'}</h5>${flop.map(rankRow).join('') || '<div class="mut sm">–</div>'}</div></div></div>`;
 }
 
 function activePens() {
@@ -374,6 +396,17 @@ function kpiHtml() {
       <div class="kpi"><b class="${t.derr >= 5 ? 'q-r' : ''}">${t.derr}</b><small>Fehler → Tor</small></div>
       <div class="kpi"><b>${t.c7m} / ${t.pen}</b><small>7m / 2 Min</small></div></div>`;
 }
+// Warnhinweise für die Kachel: Fehlwurf-Serie, gehäufte techn. Fehler, drohende Disqualifikation
+function warnings(p, s) {
+  const evs = S.game.events.filter(e => e.pid === p.id), now = clockNow(), w = [];
+  let miss = 0;
+  for (let i = evs.length - 1; i >= 0; i--) { if (evs[i].type === 'GOAL') break; if (evs[i].type === 'MISS') miss++; }
+  if (miss >= 3) w.push(`${miss} Fehlwürfe in Folge`);
+  const tf5 = evs.filter(e => e.type === 'TF' && e.t > now - 5 * 60000 && e.t <= now).length;
+  if (tf5 >= 2) w.push(`${tf5} TF in 5 Min`);
+  if (s.pen === 2 && !s.red) w.push("2× 2' – DQ droht");
+  return w;
+}
 function tileHtml(p, c, pens) {
   const s = c.p[p.id] || Z(), a = s.g + s.m, dq = s.red > 0 || s.pen >= 3;
   const pen = pens.find(x => x.e.pid === p.id);
@@ -381,10 +414,11 @@ function tileHtml(p, c, pens) {
   const att = `<i>ANG</i><span class="${a ? qcls(s.g, a) : 'mut'}">${s.g}/${a}</span>${s.as ? ` · <span class="q-g">As ${s.as}</span>` : ''}${s.tf ? ` · <span class="${s.tf >= 2 ? 'q-o' : ''}">TF ${s.tf}</span>` : ''}`;
   const dp = defPlus(s), dm = defMinus(s);
   const def = `<i>ABW</i>${dp || dm ? `<span class="q-g">+${dp}</span> <span class="${dm ? 'q-r' : 'mut'}">−${dm}</span>` : '<span class="mut">–</span>'}`;
-  return `<button class="tile ${pen ? 'out' : ''} ${dq ? 'dq' : ''}" data-act="player" data-v="${p.id}">
+  const warn = dq ? [] : warnings(p, s);
+  return `<button class="tile ${pen ? 'out' : ''} ${dq ? 'dq' : ''} ${warn.length ? 'warn' : ''}" data-act="player" data-v="${p.id}">
     ${marks ? `<span class="pd">${marks}</span>` : ''}
     <div class="nr">${esc(p.nr)}${c.p[p.id] ? `<span class="hp ${hcls(hpi(s, p))}">HPI ${hpi(s, p)}</span>` : ''}</div><div class="nm">${esc(p.name || '–')}</div>
-    <div class="ln">${att}</div><div class="ln">${def}</div>${pen ? `<span class="cd">2' ${fmtShort(pen.rest)}</span>` : ''}</button>`;
+    <div class="ln">${att}</div><div class="ln">${def}</div>${pen ? `<span class="cd">2' ${fmtShort(pen.rest)}</span>` : ''}${warn.map(x => `<span class="wn">⚠ ${x}</span>`).join('')}</button>`;
 }
 function renderLive() {
   const g = S.game, c = calc(g.events), pens = activePens();
@@ -399,8 +433,8 @@ function renderLive() {
 }
 let lastPenKey = '';
 function refreshTiles() {
-  // Kacheln nur neu zeichnen, wenn eine Zeitstrafe läuft (Countdown) oder gerade abgelaufen ist
-  const pens = activePens(), key = pens.map(x => x.e.id + Math.ceil(x.rest / 1000)).join();
+  // Kacheln neu zeichnen bei Zeitstrafen-Countdown und alle 15 s Spielzeit (Warnhinweise laufen ab)
+  const pens = activePens(), key = pens.map(x => x.e.id + Math.ceil(x.rest / 1000)).join() + '|' + Math.floor(clockNow() / 15000);
   if (key === lastPenKey) return; lastPenKey = key;
   const el = document.getElementById('tiles'); if (!el) return;
   const c = calc(S.game.events);
@@ -410,6 +444,54 @@ function refreshTiles() {
 /* ---------- Statistik ---------- */
 function viewGame() { return UI.viewId ? S.history.find(h => h.id === UI.viewId) || S.game : S.game; }
 function renderStats() {
+  const sw = `<div class="seg two">${[['game', '📋 Spiel'], ['season', '🏆 Saison']].map(([k, l]) => `<button class="${UI.scope === k ? 'on' : ''}" data-act="scope" data-v="${k}">${l}</button>`).join('')}</div>`;
+  return sw + (UI.scope === 'season' ? renderSeason() : renderGameStats());
+}
+/* ---------- Saison: alle archivierten Spiele (+ laufendes Spiel) ---------- */
+function seasonGames() { const gs = [...S.history].reverse(); if (S.game.events.length) gs.push(S.game); return gs; }
+function season() {
+  const gs = seasonGames(), T = Z(), P = {};
+  for (const g of gs) {
+    const c = calc(g.events);
+    for (const k in T) T[k] += c.t[k] || 0;
+    for (const [pid, s] of Object.entries(c.p)) {
+      const pl = player(pid) || player(pid, g); if (!pl) continue;
+      const a = P[pid] ||= { p: pl, n: 0, sum: 0, best: 0, worst: 100, s: Z() };
+      const v = hpi(s, pl);
+      a.n++; a.sum += v; a.best = Math.max(a.best, v); a.worst = Math.min(a.worst, v);
+      for (const k in a.s) a.s[k] += s[k] || 0;
+    }
+  }
+  const rk = Object.values(P).map(a => ({ ...a, v: Math.round(a.sum / a.n) })).sort((x, y) => y.v - x.v || y.n - x.n);
+  return { gs, T, rk };
+}
+function renderSeason() {
+  const { gs, T, rk } = season(), n = gs.length, a = T.g + T.m;
+  if (!n) return '<div class="empty">Noch keine Spiele.<br>Nach jedem Spiel unter „Team“ auf „Spiel abschließen“ tippen – dann erscheint hier die Saisonstatistik.</div>';
+  const per = v => (v / n).toLocaleString('de-DE', { maximumFractionDigits: 1 });
+  const liveIn = S.game.events.length > 0;
+  return `
+    <div class="card"><h4>Saison – Mannschaft</h4><div class="stats">
+      <div><b>${n}</b><small>Spiele${liveIn ? ' (inkl. laufendes)' : ''}</small></div>
+      <div><b class="${qcls(T.g, a)}">${pct(T.g, a)}</b><small>Wurfquote ${T.g}/${a}</small></div>
+      <div><b>${per(T.g)}</b><small>Ø Tore / Spiel</small></div>
+      <div><b>${per(T.tf)}</b><small>Ø Techn. Fehler</small></div>
+      <div><b>${per(T.m)}</b><small>Ø Fehlwürfe</small></div>
+      <div><b>${per(T.as)}</b><small>Ø Assists</small></div>
+      <div><b class="q-g">${per(T.bg + T.blk + T.ofd)}</b><small>Ø BG+Block+StF</small></div>
+      <div><b>${per(T.derr)}</b><small>Ø Fehler → Tor</small></div>
+      <div><b>${per(T.pen)}</b><small>Ø 2 Minuten</small></div>
+    </div></div>
+    <div class="card"><h4>Saison – HPI-Rangliste</h4>${rk.length ? `<table>
+      <tr><th>#</th><th>Spieler</th><th>Sp</th><th>Ø HPI</th><th>Best</th><th>Schw.</th></tr>
+      ${rk.map((r, i) => `<tr class="${i < TOPN ? 'top' : i >= Math.max(TOPN, rk.length - TOPN) ? 'flop' : ''}" data-act="chart" data-v="${r.p.id}"><td>${i + 1}.</td><td class="nmc"><b>${esc(r.p.nr)}</b> ${esc(r.p.name)}</td><td>${r.n}</td><td class="${hcls(r.v)}"><b>${r.v}</b></td><td class="${hcls(r.best)}">${r.best}</td><td class="${hcls(r.worst)}">${r.worst}</td></tr>`).join('')}
+    </table><div class="mut sm" style="margin-top:6px">Grün = Top ${TOPN}, rot = Flop ${TOPN}. Sp = Spiele mit mind. einer Aktion. Antippen → HPI-Verlauf.</div>` : '<div class="empty">Noch keine Einträge</div>'}</div>
+    <div class="card"><h4>Saison – Spieler gesamt</h4>${rk.length ? `<table>
+      <tr><th>Nr</th><th>Name</th><th>T/W</th><th>%</th><th>As</th><th>TF</th><th>Abw+</th><th>2'</th></tr>
+      ${[...rk].sort((x, y) => (x.p.nr || 999) - (y.p.nr || 999)).map(r => { const s = r.s, a = s.g + s.m; return `<tr><td><b>${esc(r.p.nr)}</b></td><td class="nmc">${esc(r.p.name)}</td><td>${s.g}/${a}</td><td class="${qcls(s.g, a)}">${pct(s.g, a)}</td><td>${s.as || ''}</td><td class="${s.tf / r.n >= 2 ? 'q-r' : ''}">${s.tf || ''}</td><td class="q-g">${defPlus(s) || ''}</td><td>${s.pen || ''}</td></tr>`; }).join('')}
+    </table><div class="mut sm" style="margin-top:6px">Abw+ = Ballgewinne + Blocks + Stürmerfouls herausgeholt</div>` : ''}</div>`;
+}
+function renderGameStats() {
   const g = viewGame(), isLive = g === S.game;
   const evs = UI.half ? g.events.filter(e => e.h === UI.half) : g.events;
   const c = calc(evs), t = c.t, a = t.g + t.m;
@@ -446,7 +528,7 @@ function renderStats() {
     </div></div>
     <div class="card"><h4>HPI-Rangliste</h4>${rk.length ? `<table>
       <tr><th>#</th><th>Spieler</th><th>Pos</th><th>HPI</th><th>Pkt</th><th>Angr.</th><th>Abw.</th></tr>
-      ${rk.map((r, i) => `<tr class="${i < 3 ? 'top' : i >= Math.max(3, rk.length - 3) ? 'flop' : ''}" data-act="chart" data-v="${r.p.id}"><td>${i + 1}.</td><td class="nmc"><b>${esc(r.p.nr)}</b> ${esc(r.p.name)}</td><td class="mut">${ROLES[role(r.p)].k}</td><td class="${hcls(r.v)}"><b>${r.v}</b></td><td>${hpiPts(r.s)}</td><td class="${pcls(r.s.pa)}">${fmtP(r.s.pa)}</td><td class="${pcls(r.s.pd)}">${fmtP(r.s.pd)}</td></tr>`).join('')}
+      ${rk.map((r, i) => `<tr class="${i < TOPN ? 'top' : i >= Math.max(TOPN, rk.length - TOPN) ? 'flop' : ''}" data-act="chart" data-v="${r.p.id}"><td>${i + 1}.</td><td class="nmc"><b>${esc(r.p.nr)}</b> ${esc(r.p.name)}</td><td class="mut">${ROLES[role(r.p)].k}</td><td class="${hcls(r.v)}"><b>${r.v}</b></td><td>${hpiPts(r.s)}</td><td class="${pcls(r.s.pa)}">${fmtP(r.s.pa)}</td><td class="${pcls(r.s.pd)}">${fmtP(r.s.pd)}</td></tr>`).join('')}
     </table><div class="mut sm" style="margin-top:6px">Auf einen Spieler tippen → HPI-Verlauf über alle Spieltage. Berechnung wie HBL (Team › HPI).</div>` : '<div class="empty">Noch keine Einträge</div>'}</div>
     <div class="card"><h4>Angriff pro Spieler</h4>${attP.length ? `<table>
       <tr><th>Nr</th><th>Name</th><th>T/W</th><th>%</th><th>Fehlw.</th><th>As</th><th>TF</th><th>7m</th></tr>
@@ -596,7 +678,7 @@ function report(g) {
     'ANGRIFF', `Tore/Würfe: ${t.g}/${a} (${pct(t.g, a)}) · 7m: ${t.g7}/${t.g7 + t.m7}`, `Assists: ${t.as} · Fehlwürfe: ${t.m} · Techn. Fehler: ${t.tf}`, '',
     'ABWEHR', `Ballgewinne: ${t.bg} · Blocks: ${t.blk} · Stürmerfouls herausgeholt: ${t.ofd}`, `Fehler → Gegentor: ${t.derr} · 7m verursacht: ${t.c7m} · 2 Min: ${t.pen}`, ''];
   const { top, flop } = topFlop(ranking(c, g)), line = r => `#${r.p.nr} ${r.p.name} (${fmtH(r.v)})`;
-  if (top.length || flop.length) L.push('HPI TOP 3: ' + (top.map(line).join(', ') || '–'), 'HPI FLOP 3: ' + (flop.map(line).join(', ') || '–'), '');
+  if (top.length || flop.length) L.push(`HPI TOP ${TOPN}: ` + (top.map(line).join(', ') || '–'), `HPI FLOP ${TOPN}: ` + (flop.map(line).join(', ') || '–'), '');
   L.push('SPIELER');
   for (const p of sorted(roster(g))) {
     const s = c.p[p.id]; if (!s) continue;
@@ -669,8 +751,10 @@ document.addEventListener('click', ev => {
     case 'undo': undo(); document.getElementById('toast').classList.remove('show'); break;
     case 'del': delEvent(v); break;
     case 'half': UI.half = +v; render(); break;
+    case 'scope': UI.scope = v; if (v === 'season') UI.viewId = null; render(); break;
+    case 'form': UI.form = v === '1'; render(); break;
     case 'live': UI.viewId = null; render(); break;
-    case 'view': UI.viewId = v; UI.tab = 'stats'; UI.half = 0; render(); break;
+    case 'view': UI.viewId = v; UI.tab = 'stats'; UI.scope = 'game'; UI.half = 0; render(); break;
     case 'share': share(v); break;
     case 'addp': {
       const nr = Math.max(0, ...S.team.players.map(p => +p.nr || 0)) + 1;
