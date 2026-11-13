@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Handball Feldspieler-Statistik · Version 10 -->
+<!-- Handball Feldspieler-Statistik · Version 11 -->
 <html lang="de">
 <head>
 <meta charset="utf-8">
@@ -175,7 +175,7 @@ tr.top td{background:#0f2a1b}tr.flop td{background:#2e1418}
 
 <script>
 'use strict';
-const APP_VERSION = 10;
+const APP_VERSION = 11;
 const LS_KEY = 'hbstats.v2';
 const POS = [['LA','Linksaußen'],['RL','Rückraum links'],['RM','Rückraum Mitte'],['RR','Rückraum rechts'],['RA','Rechtsaußen'],['KM','Kreis'],['GS','Gegenstoß'],['7m','7-Meter']];
 // Angriff: GOAL, MISS, TF  ·  Abwehr: BG, BLK, DERR, C7M, PEN (+ YEL, RED)  ·  Team: TO
@@ -187,7 +187,10 @@ const PEN_MS = 120000;
 const SHOT_P = { LA: [7, -7], RA: [7, -7], RL: [10, -4], RM: [10, -4], RR: [10, -4], KM: [6, -7], GS: [5, -8], '7m': [6, -8], '': [7, -6] };
 // Assist-Punkte je Position des Torwurfs (7m = Strafwurf herausgeholt)
 const AST_P = { LA: 3, RA: 3, RL: 0, RM: 0, RR: 0, KM: 4, GS: 5, '7m': 4, '': 3 };
-const EV_P = { TF: -6, BG: 8, BLK: 7, OFD: 8, C7M: -3, RED: -12, YEL: 0, DERR: 0 };  // DERR ist nicht Teil des HBL-HPI
+const EV_P = { TF: -6, TF_SF: -8, BG: 8, BLK: 7, OFD: 8, C7M: -3, RED: -12, YEL: 0, DERR: -4 };  // DERR: eigener Wert (nicht Teil des HBL-HPI)
+// Art des technischen Fehlers (optional). Stürmerfoul zählt wie bei der HBL −8, alle anderen −6.
+const TF_TYPES = [['PASS', 'Passfehler'], ['FANG', 'Fangfehler'], ['SCHR', 'Schritte / Doppel'], ['SF', 'Stürmerfoul'], ['ZEIT', 'Zeitspiel / Sonstiges']];
+const TFL = Object.fromEntries(TF_TYPES); TFL.NA = 'ohne Angabe';
 const PEN_P = [-3, -4, -6];                                                    // 1./2./3. Zeitstrafe
 // Skala 50–100: (Punkte − MIN) × 50 / (MAX − MIN) + 50, MIN/MAX = Median der schwächsten/besten 1 % je Position
 const ROLES = { RR: { n: 'Rückraum', k: 'Rück', min: 61, max: 179 }, AU: { n: 'Außen', k: 'Außen', min: 72, max: 166 }, KM: { n: 'Kreis', k: 'Kreis', min: 67, max: 159 } };
@@ -275,7 +278,7 @@ function pname(pid, g, short) {
 }
 const Z = () => ({ g: 0, m: 0, g7: 0, m7: 0, tf: 0, bg: 0, blk: 0, derr: 0, c7m: 0, pen: 0, yel: 0, red: 0, as: 0, ofd: 0, pa: 0, pd: 0 });
 function calc(evs) {
-  const p = {}, t = Z(); t.to = 0;
+  const p = {}, t = Z(), tft = {}; t.to = 0;
   const pos = {}; POS.forEach(([k]) => pos[k] = { g: 0, a: 0 });
   for (const e of evs) {
     if (e.type === 'TO') { t.to++; continue; }
@@ -285,7 +288,11 @@ function calc(evs) {
       case 'GOAL': inc('g'); if (is7) inc('g7'); if (ps) { ps.g++; ps.a++; } x.pa += sp[0]; break;
       case 'MISS': inc('m'); if (is7) inc('m7'); if (ps) ps.a++; x.pa += sp[1]; break;
       case 'AST': inc('as'); x.pa += AST_P[e.pos] ?? AST_P['']; break;
-      case 'TF': inc('tf'); x.pa += EV_P.TF; break;
+      case 'TF': {
+        inc('tf'); x.pa += e.sub === 'SF' ? EV_P.TF_SF : EV_P.TF;
+        const k = e.sub || 'NA', b = tft[k] ||= { n: 0, by: {} };
+        b.n++; if (e.pid) b.by[e.pid] = (b.by[e.pid] || 0) + 1; break;
+      }
       case 'OFD': inc('ofd'); x.pd += EV_P.OFD; break;
       case 'BG': inc('bg'); x.pd += EV_P.BG; break;
       case 'BLK': inc('blk'); x.pd += EV_P.BLK; break;
@@ -296,7 +303,7 @@ function calc(evs) {
       case 'RED': inc('red'); x.pd += EV_P.RED; break;
     }
   }
-  return { p, t, pos };
+  return { p, t, pos, tft };
 }
 const qcls = (g, a) => a < 3 ? '' : g / a >= .6 ? 'q-g' : g / a >= .4 ? 'q-o' : 'q-r';
 const attErr = s => s.m + s.tf;                 // Fehler im Angriff
@@ -320,6 +327,22 @@ function topFlop(rk) {
   const top = rk.filter(r => hpiPts(r.s) > 100).slice(0, TOPN);
   const flop = rk.filter(r => hpiPts(r.s) < 100 && !top.includes(r)).slice(-TOPN).reverse();
   return { top, flop };
+}
+function mergeTft(into, tft) {
+  for (const [k, b] of Object.entries(tft)) {
+    const m = into[k] ||= { n: 0, by: {} }; m.n += b.n;
+    for (const [pid, n] of Object.entries(b.by)) m.by[pid] = (m.by[pid] || 0) + n;
+  }
+  return into;
+}
+function tfCard(tft, g, title) {
+  const keys = [...TF_TYPES.map(x => x[0]), 'NA'].filter(k => tft[k]);
+  if (!keys.length) return '';
+  const total = keys.reduce((a, k) => a + tft[k].n, 0);
+  return `<div class="card"><h4>${title}</h4><table>
+    <tr><th>Art</th><th></th><th>Anz.</th><th>Spieler</th></tr>
+    ${keys.map(k => { const b = tft[k]; return `<tr><td class="nmc"><b>${TFL[k]}</b></td><td class="mut">${pct(b.n, total)}</td><td>${b.n}</td><td class="sm" style="text-align:right">${Object.entries(b.by).sort((x, y) => y[1] - x[1]).map(([pid, n]) => esc(pname(pid, g, true)) + (n > 1 ? ' ×' + n : '')).join(', ')}</td></tr>`; }).join('')}
+  </table></div>`;
 }
 function rankRow(r, i) {
   return `<div class="rk"><span class="i">${i + 1}.</span><b>#${esc(r.p.nr)}</b><span class="n">${esc(r.p.name)}</span><span class="v ${hcls(r.v)}">${fmtH(r.v)}</span></div>`;
@@ -346,11 +369,11 @@ function activePens() {
 }
 
 /* ---------- Events ---------- */
-function add(type, pid, pos) {
-  S.game.events.push({ id: uid(), t: clockNow(), h: S.game.half, type, pid: pid || null, pos: pos || null });
+function add(type, pid, pos, sub) {
+  S.game.events.push({ id: uid(), t: clockNow(), h: S.game.half, type, pid: pid || null, pos: pos || null, ...(sub ? { sub } : {}) });
   if (type === 'TO') stopClock();
   save(); vib(25); closeSheet();
-  toast((pid ? pname(pid, null, true) + ' – ' : '') + LBL[type] + (pos ? ' (' + pos + ')' : ''), true);
+  toast((pid ? pname(pid, null, true) + ' – ' : '') + LBL[type] + (pos ? ' (' + pos + ')' : '') + (sub ? ' – ' + TFL[sub] : ''), true);
   render();
 }
 function undo() { const e = S.game.events.pop(); if (!e) return; save(); vib(15); toast('Gelöscht: ' + LBL[e.type]); render(); }
@@ -457,9 +480,9 @@ function renderStats() {
 /* ---------- Saison: alle archivierten Spiele (+ laufendes Spiel) ---------- */
 function seasonGames() { const gs = [...S.history].reverse(); if (S.game.events.length) gs.push(S.game); return gs; }
 function season() {
-  const gs = seasonGames(), T = Z(), P = {};
+  const gs = seasonGames(), T = Z(), P = {}, TFT = {};
   for (const g of gs) {
-    const c = calc(g.events);
+    const c = calc(g.events); mergeTft(TFT, c.tft);
     for (const k in T) T[k] += c.t[k] || 0;
     for (const [pid, s] of Object.entries(c.p)) {
       const pl = player(pid) || player(pid, g); if (!pl) continue;
@@ -470,10 +493,10 @@ function season() {
     }
   }
   const rk = Object.values(P).map(a => ({ ...a, v: Math.round(a.sum / a.n) })).sort((x, y) => y.v - x.v || y.n - x.n);
-  return { gs, T, rk };
+  return { gs, T, rk, TFT };
 }
 function renderSeason() {
-  const { gs, T, rk } = season(), n = gs.length, a = T.g + T.m;
+  const { gs, T, rk, TFT } = season(), n = gs.length, a = T.g + T.m;
   if (!n) return '<div class="empty">Noch keine Spiele.<br>Nach jedem Spiel unter „Team“ auf „Spiel abschließen“ tippen – dann erscheint hier die Saisonstatistik.</div>';
   const per = v => (v / n).toLocaleString('de-DE', { maximumFractionDigits: 1 });
   const liveIn = S.game.events.length > 0;
@@ -496,7 +519,8 @@ function renderSeason() {
     <div class="card"><h4>Saison – Spieler gesamt</h4>${rk.length ? `<table>
       <tr><th>Nr</th><th>Name</th><th>T/W</th><th>%</th><th>As</th><th>TF</th><th>Abw+</th><th>2'</th></tr>
       ${[...rk].sort((x, y) => (x.p.nr || 999) - (y.p.nr || 999)).map(r => { const s = r.s, a = s.g + s.m; return `<tr><td><b>${esc(r.p.nr)}</b></td><td class="nmc">${esc(r.p.name)}</td><td>${s.g}/${a}</td><td class="${qcls(s.g, a)}">${pct(s.g, a)}</td><td>${s.as || ''}</td><td class="${s.tf / r.n >= 2 ? 'q-r' : ''}">${s.tf || ''}</td><td class="q-g">${defPlus(s) || ''}</td><td>${s.pen || ''}</td></tr>`; }).join('')}
-    </table><div class="mut sm" style="margin-top:6px">Abw+ = Ballgewinne + Blocks + Stürmerfouls herausgeholt</div>` : ''}</div>`;
+    </table><div class="mut sm" style="margin-top:6px">Abw+ = Ballgewinne + Blocks + Stürmerfouls herausgeholt</div>` : ''}</div>
+    ${tfCard(TFT, null, 'Saison – Techn. Fehler nach Art')}`;
 }
 function renderGameStats() {
   const g = viewGame(), isLive = g === S.game;
@@ -545,6 +569,7 @@ function renderGameStats() {
       <tr><th>Nr</th><th>Name</th><th>BG</th><th>Blk</th><th>StF</th><th>F→T</th><th>7m</th><th>2'</th></tr>
       ${defP.map(p => { const s = c.p[p.id]; return `<tr><td><b>${esc(p.nr)}</b></td><td class="nmc">${esc(p.name)}</td><td class="q-g">${s.bg || ''}</td><td class="q-g">${s.blk || ''}</td><td class="q-g">${s.ofd || ''}</td><td class="${s.derr ? 'q-r' : ''}">${s.derr || ''}</td><td>${s.c7m || ''}</td><td>${s.pen || ''}${s.yel ? '🟨' : ''}${s.red ? '🟥' : ''}</td></tr>`; }).join('')}
     </table>` : '<div class="empty">Noch keine Einträge</div>'}</div>
+    ${tfCard(c.tft, g, 'Techn. Fehler nach Art')}
     <div class="card"><h4>Würfe nach Position</h4><table>
       <tr><th>Pos</th><th></th><th>T/W</th><th>%</th></tr>
       ${POS.map(([k, n]) => { const p = c.pos[k]; return `<tr><td><b>${k}</b></td><td class="nmc mut">${n}</td><td>${p.g}/${p.a}</td><td class="${qcls(p.g, p.a)}">${pct(p.g, p.a)}</td></tr>`; }).join('')}
@@ -560,7 +585,7 @@ function renderLog() {
   const rows = [...S.game.events].reverse();
   if (!rows.length) return '<div class="empty">Noch keine Einträge.<br>Im Live-Tab auf einen Spieler tippen.</div>';
   return rows.map(e => `<div class="ev"><span class="t">${fmt(e.t)}</span>
-    <span class="d"><span class="dot" style="background:${COL[e.type] || 'var(--mut)'}"></span>${esc(LBL[e.type] || e.type)}${e.pos ? ' <span class="mut">(' + e.pos + ')</span>' : ''}${e.pid ? ' · ' + esc(pname(e.pid)) : ''}</span>
+    <span class="d"><span class="dot" style="background:${COL[e.type] || 'var(--mut)'}"></span>${esc(LBL[e.type] || e.type)}${e.pos ? ' <span class="mut">(' + e.pos + ')</span>' : ''}${e.sub ? ' <span class="mut">– ' + TFL[e.sub] + '</span>' : ''}${e.pid ? ' · ' + esc(pname(e.pid)) : ''}</span>
     <button data-act="del" data-v="${e.id}">✕</button></div>`).join('');
 }
 
@@ -593,9 +618,10 @@ function renderTeam() {
       <table style="margin-top:8px"><tr><th>Aktion</th><th></th><th>Punkte</th></tr>
         <tr><td>Ballgewinn</td><td></td><td class="q-g">+8</td></tr><tr><td>Block</td><td></td><td class="q-g">+7</td></tr>
         <tr><td>Stürmerfoul herausgeholt</td><td></td><td class="q-g">+8</td></tr>
-        <tr><td>Techn. Fehler</td><td></td><td class="q-r">−6</td></tr><tr><td>7m verursacht</td><td></td><td class="q-r">−3</td></tr>
+        <tr><td>Techn. Fehler</td><td class="mut">Stürmerfoul −8</td><td class="q-r">−6</td></tr><tr><td>7m verursacht</td><td></td><td class="q-r">−3</td></tr>
         <tr><td>2 Minuten</td><td class="mut">1./2./3.</td><td class="q-r">−3/−4/−6</td></tr><tr><td>Rote Karte</td><td></td><td class="q-r">−12</td></tr>
-        <tr><td>Fehler → Gegentor</td><td class="mut">nicht im HBL-HPI</td><td>0</td></tr></table>
+        <tr><td>Fehler → Gegentor</td><td class="mut">eigener Wert*</td><td class="q-r">−4</td></tr></table>
+      <p class="mut sm" style="margin:6px 0 0">* „Fehler → Gegentor“ gibt es im HBL-HPI nicht. Er zählt hier −4, damit Abwehrfehler sichtbar werden.</p>
       <p class="mut sm" style="margin:8px 0 0">HPI = (Punkte − MIN) × 50 / (MAX − MIN) + 50, max. 100.<br>Rückraum 61–179 · Außen 72–166 · Kreis 67–159</p>
     </div>
     <div class="card"><h4>Vergangene Spiele</h4>
@@ -629,6 +655,14 @@ function renderSheet() {
   if (UI.sheet.chart) { el.innerHTML = `<div class="sheetbg" data-act="bg"><div class="sheet">${chartHtml(UI.sheet.chart)}<button class="cancel" data-act="close">Schließen</button></div></div>`; return; }
   const p = player(UI.sheet.pid); if (!p) return closeSheet();
   const s = calc(S.game.events).p[p.id] || Z();
+  if (UI.sheet.tf) {
+    el.innerHTML = `<div class="sheetbg" data-act="bg"><div class="sheet">
+      <h3>#${esc(p.nr)} ${esc(p.name)}<small>Techn. Fehler – welche Art?</small></h3>
+      <div class="acts two" style="margin-top:12px">${TF_TYPES.map(([k, n]) => `<button class="${k === 'SF' ? 'b-rd' : 'b-or'}" data-act="tfsub" data-v="${k}">${n}${k === 'SF' ? '<br><small style="font-weight:600">−8 HPI</small>' : ''}</button>`).join('')}
+        <button data-act="tfsub" data-v="">Ohne Angabe</button></div>
+      <button class="cancel" data-act="tfback">← Zurück</button></div></div>`;
+    return;
+  }
   el.innerHTML = `<div class="sheetbg" data-act="bg"><div class="sheet">
     <h3>#${esc(p.nr)} ${esc(p.name)}<small>${s.g}/${s.g + s.m} · TF ${s.tf} · HPI ${hpi(s, p)}</small></h3>
     <div class="lbl">Angriff</div>
@@ -685,6 +719,7 @@ function report(g) {
   const c = calc(g.events), t = c.t, a = t.g + t.m;
   const L = [`🤾 ${g.teamName || S.team.name} gegen ${g.opponent} – Feldspieler-Statistik`, new Date(g.date).toLocaleDateString('de-DE'), '',
     'ANGRIFF', `Tore/Würfe: ${t.g}/${a} (${pct(t.g, a)}) · 7m: ${t.g7}/${t.g7 + t.m7}`, `Assists: ${t.as} · Fehlwürfe: ${t.m} · Techn. Fehler: ${t.tf}`, '',
+    ...(Object.keys(c.tft).length ? ['TF nach Art: ' + [...TF_TYPES.map(x => x[0]), 'NA'].filter(k => c.tft[k]).map(k => `${TFL[k]} ${c.tft[k].n}`).join(' · '), ''] : []),
     'ABWEHR', `Ballgewinne: ${t.bg} · Blocks: ${t.blk} · Stürmerfouls herausgeholt: ${t.ofd}`, `Fehler → Gegentor: ${t.derr} · 7m verursacht: ${t.c7m} · 2 Min: ${t.pen}`, ''];
   const { top, flop } = topFlop(ranking(c, g)), line = r => `#${r.p.nr} ${r.p.name} (${fmtH(r.v)})`;
   if (top.length || flop.length) L.push(`HPI TOP ${TOPN}: ` + (top.map(line).join(', ') || '–'), `HPI FLOP ${TOPN}: ` + (flop.map(line).join(', ') || '–'), '');
@@ -762,7 +797,11 @@ document.addEventListener('click', ev => {
     }
     case 'player': openSheet(v); break;
     case 'pos': UI.pos = UI.pos === v ? null : v; renderSheet(); break;
-    case 'ev': add(v, UI.sheet.pid, (v === 'GOAL' || v === 'MISS' || v === 'AST') ? UI.pos : null); break;
+    case 'ev':
+      if (v === 'TF') { UI.sheet.tf = true; renderSheet(); break; }
+      add(v, UI.sheet.pid, (v === 'GOAL' || v === 'MISS' || v === 'AST') ? UI.pos : null); break;
+    case 'tfsub': add('TF', UI.sheet.pid, null, v || null); break;
+    case 'tfback': UI.sheet.tf = false; renderSheet(); break;
     case 'bg': case 'close': { const lu = UI.sheet && UI.sheet.lineup; closeSheet(); if (lu) render(); break; }
     case 'lineup': UI.sheet = { lineup: true }; document.getElementById('toast').classList.remove('show'); renderSheet(); break;
     case 'tog': {
