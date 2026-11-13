@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Handball Feldspieler-Statistik · Version 9 -->
+<!-- Handball Feldspieler-Statistik · Version 10 -->
 <html lang="de">
 <head>
 <meta charset="utf-8">
@@ -152,6 +152,11 @@ tr.top td{background:#0f2a1b}tr.flop td{background:#2e1418}
 .tfsw button{padding:8px 4px;font-size:12px;font-weight:700;background:var(--card);color:var(--mut)}
 .tfsw button.on{background:var(--card2);color:var(--tx);outline:1px solid var(--or)}
 .tf1{background:var(--card);border-radius:12px;padding:12px;margin-top:6px;text-align:center}
+.banner{flex-wrap:wrap}
+.banner .bb{display:grid;grid-template-columns:repeat(4,auto);gap:6px;width:100%}
+.banner .bb button{padding:9px 4px;font-size:12.5px;font-weight:600}
+#upd{position:fixed;left:10px;right:10px;top:calc(8px + env(safe-area-inset-top));z-index:40;padding:13px;background:var(--bl);color:#fff;font-weight:800;box-shadow:0 6px 20px #0008}
+#upd[hidden]{display:none}
 @media (min-width:600px){.grid{grid-template-columns:repeat(4,1fr)}main{max-width:760px;margin:0 auto}}
 </style>
 </head>
@@ -165,10 +170,12 @@ tr.top td{background:#0f2a1b}tr.flop td{background:#2e1418}
   <button data-act="tab" data-v="team"><b>👥</b>Team</button>
 </nav>
 <div id="sheet"></div>
+<button id="upd" data-act="update" hidden>⬆ Neue Version verfügbar – antippen</button>
 <div id="toast"><span></span><button data-act="undo">Rückgängig</button></div>
 
 <script>
 'use strict';
+const APP_VERSION = 10;
 const LS_KEY = 'hbstats.v2';
 const POS = [['LA','Linksaußen'],['RL','Rückraum links'],['RM','Rückraum Mitte'],['RR','Rückraum rechts'],['RA','Rechtsaußen'],['KM','Kreis'],['GS','Gegenstoß'],['7m','7-Meter']];
 // Angriff: GOAL, MISS, TF  ·  Abwehr: BG, BLK, DERR, C7M, PEN (+ YEL, RED)  ·  Team: TO
@@ -323,7 +330,7 @@ function topFlopHtml(c) {
   const cc = UI.form ? calc(S.game.events.filter(e => e.t > now - FORM_MS && e.t <= now)) : c;
   const { top, flop } = topFlop(ranking(cc));
   const sw = `<div class="tfsw"><button class="${UI.form ? '' : 'on'}" data-act="form" data-v="0">Gesamtes Spiel</button><button class="${UI.form ? 'on' : ''}" data-act="form" data-v="1">🔥 Form: letzte 10 Min</button></div>`;
-  if (!top.length && !flop.length) return `<div id="tfbox">${sw}<div class="tf1 mut sm">Keine Aktionen in den letzten 10 Spielminuten</div></div>`;
+  if (!top.length && !flop.length) return `<div id="tfbox">${sw}<div class="tf1 mut sm">${UI.form ? 'Keine Plus- oder Minuspunkte in den letzten 10 Spielminuten' : 'Noch keine Plus- oder Minuspunkte'}</div></div>`;
   return `<div id="tfbox">${sw}<div class="tf"><div><h5 class="q-g">▲ Top ${TOPN} ${UI.form ? 'Form' : 'HPI'}</h5>${top.map(rankRow).join('') || '<div class="mut sm">–</div>'}</div>
     <div><h5 class="q-r">▼ Flop ${TOPN} ${UI.form ? 'Form' : 'HPI'}</h5>${flop.map(rankRow).join('') || '<div class="mut sm">–</div>'}</div></div></div>`;
 }
@@ -507,7 +514,7 @@ function renderGameStats() {
   }
   const maxB = Math.max(1, ...blocks.map(b => Math.max(b[1], b[2])));
   return `
-    ${!isLive ? `<div class="banner"><div>Archiv: <b>gegen ${esc(g.opponent)}</b><br><small>${new Date(g.date).toLocaleDateString('de-DE')}</small></div><button data-act="share" data-v="${g.id}">Teilen</button><button data-act="live">Zurück</button></div>` : ''}
+    ${!isLive ? `<div class="banner"><div>Archiv: <b>gegen ${esc(g.opponent)}</b> <small class="mut">${new Date(g.date).toLocaleDateString('de-DE')}</small></div><span class="bb"><button data-act="rename" data-v="${g.id}">✏ Gegner</button><button data-act="reopen" data-v="${g.id}">↩ Wieder öffnen</button><button data-act="share" data-v="${g.id}">Teilen</button><button class="b-bl" data-act="live">Zurück</button></span></div>` : ''}
     <div class="seg">${['Gesamt', '1. HZ', '2. HZ'].map((l, i) => `<button class="${UI.half === i ? 'on' : ''}" data-act="half" data-v="${i}">${l}</button>`).join('')}</div>
     <div class="card"><h4>Mannschaft – Angriff</h4><div class="stats">
       <div><b class="${qcls(t.g, a)}">${t.g}/${a}</b><small>Tore/Würfe ${pct(t.g, a)}</small></div>
@@ -595,9 +602,11 @@ function renderTeam() {
       ${S.history.length ? S.history.map(h => `<div class="hist"><div><b>${esc(h.opponent)}</b><br><small>${new Date(h.date).toLocaleDateString('de-DE')}</small></div><button data-act="view" data-v="${h.id}">Ansehen</button><button data-act="share" data-v="${h.id}">Teilen</button><button data-act="delh" data-v="${h.id}">✕</button></div>`).join('') : '<div class="empty">Noch keine abgeschlossenen Spiele</div>'}
     </div>
     <div class="card"><h4>Daten</h4>
-      <button class="btn" data-act="export">💾 Backup exportieren</button>
+      <button class="btn" data-act="export">💾 Backup sichern / teilen</button>
       <button class="btn" data-act="import">📂 Backup importieren</button>
-      <p class="mut" style="font-size:12px;margin:10px 0 0">Alle Daten liegen nur auf diesem Handy (kein Internet nötig). Tipp: nach jedem Spieltag ein Backup machen.</p>
+      <p class="sm ${S.settings.lastBackup ? 'mut' : 'q-o'}" style="margin:10px 0 0">Letztes Backup: ${S.settings.lastBackup ? new Date(S.settings.lastBackup).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' }) : 'noch keines'}</p>
+      <p class="mut sm" style="margin:6px 0 0">Alle Daten liegen nur auf diesem Handy (kein Internet nötig). Tipp: nach jedem Spieltag ein Backup machen.</p>
+      <p class="mut sm" style="margin:6px 0 0">App-Version ${APP_VERSION}</p>
     </div>`;
 }
 
@@ -696,14 +705,28 @@ async function share(id) {
   try { if (navigator.share) { await navigator.share({ text: txt }); return; } } catch (e) { if (e.name === 'AbortError') return; }
   try { await navigator.clipboard.writeText(txt); toast('Bericht kopiert'); } catch (e) { prompt('Bericht kopieren:', txt); }
 }
-function exportData() {
+async function exportData() {
+  const json = JSON.stringify(S, null, 1), base = 'handball-backup-' + new Date().toISOString().slice(0, 10);
+  const done = () => { S.settings.lastBackup = new Date().toISOString(); save(); if (UI.tab === 'team') render(); };
+  // Handy: Teilen-Menü (In Dateien sichern, Drive, WhatsApp …). Manche Browser teilen nur Textdateien.
+  for (const [ext, type] of [['json', 'application/json'], ['txt', 'text/plain']]) {
+    try {
+      const file = new File([json], base + '.' + ext, { type });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'Handball-Backup' });
+        done(); toast('Backup geteilt'); return;
+      }
+    } catch (e) { if (e.name === 'AbortError') return; }
+  }
+  // PC / Fallback: Datei herunterladen
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([JSON.stringify(S, null, 1)], { type: 'application/json' }));
-  a.download = 'handball-stats-' + new Date().toISOString().slice(0, 10) + '.json'; a.click();
+  a.href = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+  a.download = base + '.json'; a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  done(); toast('Backup heruntergeladen');
 }
 function importData() {
-  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'application/json,.json';
+  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.json,.txt,application/json,text/plain';
   inp.onchange = async () => {
     try {
       const s = JSON.parse(await inp.files[0].text()); if (!s.team || !s.game) throw new Error();
@@ -768,11 +791,27 @@ document.addEventListener('click', ev => {
       if (running()) { alert('Bitte zuerst die Uhr stoppen.'); return; }
       if (!confirm('Aktuelles Spiel abschließen und ins Archiv legen?')) return;
       if (S.game.events.length) S.history.unshift({ ...S.game, runStart: null, roster: JSON.parse(JSON.stringify(S.team.players)), teamName: S.team.name, halfMin: S.settings.halfMin });
+      S.history.sort((a, b) => new Date(b.date) - new Date(a.date));
       S.game = newGame(); save(); render(); toast('Neues Spiel angelegt'); break;
     }
     case 'delh': if (confirm('Archiviertes Spiel löschen?')) { S.history = S.history.filter(h => h.id !== v); save(); render(); } break;
     case 'chart': UI.sheet = { chart: v }; document.getElementById('toast').classList.remove('show'); renderSheet(); break;
     case 'export': exportData(); break;
+    case 'update': location.reload(); break;
+    case 'rename': {
+      const h = S.history.find(x => x.id === v); if (!h) return;
+      const n = prompt('Gegner ändern', h.opponent); if (n === null) return;
+      h.opponent = n.trim() || 'Gegner'; save(); render(); break;
+    }
+    case 'reopen': {
+      const h = S.history.find(x => x.id === v); if (!h) return;
+      if (S.game.events.length) { alert('Es läuft noch ein Spiel mit Einträgen. Bitte dieses zuerst unter „Team“ abschließen.'); return; }
+      if (!confirm(`Spiel gegen ${h.opponent} wieder öffnen? Es wird zum aktuellen Spiel und du kannst weiter erfassen oder korrigieren.`)) return;
+      S.history = S.history.filter(x => x.id !== v);
+      const { roster: _r, teamName: _t, halfMin: _h, ...g } = h;
+      S.game = { ...g, runStart: null, out: g.out || [] };
+      UI.viewId = null; UI.tab = 'log'; save(); render(); toast('Spiel wieder geöffnet'); break;
+    }
     case 'import': importData(); break;
   }
 });
@@ -790,6 +829,25 @@ document.addEventListener('change', ev => {
 
 render();
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
+// Daten dauerhaft behalten (Browser soll den Speicher nicht von sich aus leeren)
+try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) {}
+// Update-Hinweis: Der Offline-Cache lädt im Hintergrund die neueste Version. Ist sie neuer als die laufende, Knopf zeigen.
+async function checkUpdate() {
+  try {
+    if (!('caches' in window)) return;
+    const paths = [location.pathname, location.pathname.replace(/[^/]*$/, '') + 'index.html', location.pathname.replace(/[^/]*$/, '')];
+    for (const k of await caches.keys()) {
+      const c = await caches.open(k);
+      for (const path of paths) {
+        const r = await c.match(location.origin + path); if (!r) continue;
+        const m = (await r.text()).match(/const APP_VERSION = (\d+);/);
+        if (m && +m[1] > APP_VERSION) { document.getElementById('upd').hidden = false; return; }
+      }
+    }
+  } catch (e) {}
+}
+setTimeout(checkUpdate, 4000);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') setTimeout(checkUpdate, 4000); });
 </script>
 </body>
 </html>
