@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Handball Feldspieler-Statistik · Version 11 -->
+<!-- Handball Feldspieler-Statistik · Version 12 -->
 <html lang="de">
 <head>
 <meta charset="utf-8">
@@ -66,7 +66,7 @@ nav button.on{color:var(--tx);font-weight:700}
 .sheet h3 small{color:var(--mut);font-size:13px;font-weight:500;margin-left:6px}
 .lbl{font-size:12px;color:var(--mut);margin:12px 0 6px;font-weight:700;text-transform:uppercase;letter-spacing:.4px}
 .lbl.sm{text-transform:none;font-weight:500;letter-spacing:0;margin-top:6px}
-.poss{display:grid;grid-template-columns:repeat(8,1fr);gap:4px}
+.poss{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
 .poss button{padding:9px 0;font-weight:700;font-size:13px}
 .poss button.on{background:var(--bl);color:#fff}
 .acts{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
@@ -175,18 +175,18 @@ tr.top td{background:#0f2a1b}tr.flop td{background:#2e1418}
 
 <script>
 'use strict';
-const APP_VERSION = 11;
+const APP_VERSION = 12;
 const LS_KEY = 'hbstats.v2';
-const POS = [['LA','Linksaußen'],['RL','Rückraum links'],['RM','Rückraum Mitte'],['RR','Rückraum rechts'],['RA','Rechtsaußen'],['KM','Kreis'],['GS','Gegenstoß'],['7m','7-Meter']];
+const POS = [['LA','Linksaußen'],['RL','Rückraum links'],['RM','Rückraum Mitte'],['RR','Rückraum rechts'],['RA','Rechtsaußen'],['KM','Kreis'],['DB','Durchbruch'],['GS','Gegenstoß'],['7m','7-Meter']];
 // Angriff: GOAL, MISS, TF  ·  Abwehr: BG, BLK, DERR, C7M, PEN (+ YEL, RED)  ·  Team: TO
 const LBL = {GOAL:'Tor',MISS:'Fehlwurf',AST:'Assist',OFD:'Stürmerfoul herausgeholt',TF:'Techn. Fehler',BG:'Ballgewinn',BLK:'Block',DERR:'Fehler → Gegentor',C7M:'7m verursacht',PEN:'2 Minuten',YEL:'Gelbe Karte',RED:'Rote Karte',TO:'Auszeit'};
 const COL = {GOAL:'var(--gr)',MISS:'var(--rd)',AST:'var(--gr)',OFD:'var(--cy)',TF:'var(--or)',BG:'var(--bl)',BLK:'var(--cy)',DERR:'var(--rd)',C7M:'var(--or)',PEN:'var(--or)',YEL:'var(--yl)',RED:'var(--rd)',TO:'var(--mut)'};
 const PEN_MS = 120000;
 // HPI nach HBL-Vorbild (opel-hbl.de › Statistiken › Handball Performance Index › Berechnung, Stand 2026/27)
 // Jeder Spieler startet mit 100 HPI-Punkten. Wurfpunkte je Wurfposition: [Tor, Fehlwurf]
-const SHOT_P = { LA: [7, -7], RA: [7, -7], RL: [10, -4], RM: [10, -4], RR: [10, -4], KM: [6, -7], GS: [5, -8], '7m': [6, -8], '': [7, -6] };
+const SHOT_P = { LA: [7, -7], RA: [7, -7], RL: [10, -4], RM: [10, -4], RR: [10, -4], KM: [6, -7], DB: [6, -7], GS: [5, -8], '7m': [6, -8], '': [7, -6] };
 // Assist-Punkte je Position des Torwurfs (7m = Strafwurf herausgeholt)
-const AST_P = { LA: 3, RA: 3, RL: 0, RM: 0, RR: 0, KM: 4, GS: 5, '7m': 4, '': 3 };
+const AST_P = { LA: 3, RA: 3, RL: 0, RM: 0, RR: 0, KM: 4, DB: 4, GS: 5, '7m': 4, '': 3 };
 const EV_P = { TF: -6, TF_SF: -8, BG: 8, BLK: 7, OFD: 8, C7M: -3, RED: -12, YEL: 0, DERR: -4 };  // DERR: eigener Wert (nicht Teil des HBL-HPI)
 // Art des technischen Fehlers (optional). Stürmerfoul zählt wie bei der HBL −8, alle anderen −6.
 const TF_TYPES = [['PASS', 'Passfehler'], ['FANG', 'Fangfehler'], ['SCHR', 'Schritte / Doppel'], ['SF', 'Stürmerfoul'], ['ZEIT', 'Zeitspiel / Sonstiges']];
@@ -609,8 +609,9 @@ function renderTeam() {
       <p class="mut sm" style="margin:0 0 8px">Jeder Spieler startet mit 100 Punkten. Aktionen geben Plus- oder Minuspunkte. Daraus wird je nach Position (oben im Kader einstellen) der HPI auf einer Skala von 50 bis 100 berechnet.</p>
       <table><tr><th>Wurf</th><th></th><th>Tor</th><th>Fehlw.</th><th>Assist</th></tr>
         <tr><td>LA / RA</td><td class="mut">Außen</td><td class="q-g">+7</td><td class="q-r">−7</td><td class="q-g">+3</td></tr>
-        <tr><td>RL/RM/RR</td><td class="mut">9 m</td><td class="q-g">+10</td><td class="q-r">−4</td><td>0</td></tr>
+        <tr><td>RL/RM/RR</td><td class="mut">Fernwurf 9 m</td><td class="q-g">+10</td><td class="q-r">−4</td><td>0</td></tr>
         <tr><td>KM</td><td class="mut">Kreis</td><td class="q-g">+6</td><td class="q-r">−7</td><td class="q-g">+4</td></tr>
+        <tr><td>DB</td><td class="mut">Durchbruch (6 m)</td><td class="q-g">+6</td><td class="q-r">−7</td><td class="q-g">+4</td></tr>
         <tr><td>GS</td><td class="mut">Gegenstoß</td><td class="q-g">+5</td><td class="q-r">−8</td><td class="q-g">+5</td></tr>
         <tr><td>7m</td><td class="mut">Strafwurf</td><td class="q-g">+6</td><td class="q-r">−8</td><td class="q-g">+4</td></tr>
         <tr><td>ohne Pos.</td><td class="mut">Rückraum allg.</td><td class="q-g">+7</td><td class="q-r">−6</td><td class="q-g">+3</td></tr></table>
