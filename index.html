@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Handball Feldspieler-Statistik · Version 12 -->
+<!-- Handball Feldspieler-Statistik · Version 13 -->
 <html lang="de">
 <head>
 <meta charset="utf-8">
@@ -157,6 +157,7 @@ tr.top td{background:#0f2a1b}tr.flop td{background:#2e1418}
 .banner .bb button{padding:9px 4px;font-size:12.5px;font-weight:600}
 #upd{position:fixed;left:10px;right:10px;top:calc(8px + env(safe-area-inset-top));z-index:40;padding:13px;background:var(--bl);color:#fff;font-weight:800;box-shadow:0 6px 20px #0008}
 #upd[hidden]{display:none}
+.repbtn{margin:0 0 10px}
 @media (min-width:600px){.grid{grid-template-columns:repeat(4,1fr)}main{max-width:760px;margin:0 auto}}
 </style>
 </head>
@@ -175,7 +176,7 @@ tr.top td{background:#0f2a1b}tr.flop td{background:#2e1418}
 
 <script>
 'use strict';
-const APP_VERSION = 12;
+const APP_VERSION = 13;
 const LS_KEY = 'hbstats.v2';
 const POS = [['LA','Linksaußen'],['RL','Rückraum links'],['RM','Rückraum Mitte'],['RR','Rückraum rechts'],['RA','Rechtsaußen'],['KM','Kreis'],['DB','Durchbruch'],['GS','Gegenstoß'],['7m','7-Meter']];
 // Angriff: GOAL, MISS, TF  ·  Abwehr: BG, BLK, DERR, C7M, PEN (+ YEL, RED)  ·  Team: TO
@@ -475,7 +476,10 @@ function refreshTiles() {
 function viewGame() { return UI.viewId ? S.history.find(h => h.id === UI.viewId) || S.game : S.game; }
 function renderStats() {
   const sw = `<div class="seg two">${[['game', '📋 Spiel'], ['season', '🏆 Saison']].map(([k, l]) => `<button class="${UI.scope === k ? 'on' : ''}" data-act="scope" data-v="${k}">${l}</button>`).join('')}</div>`;
-  return sw + (UI.scope === 'season' ? renderSeason() : renderGameStats());
+  const rb = UI.scope === 'season'
+    ? (seasonGames().length ? `<button class="btn b-bl repbtn" data-act="rep" data-v="season">📄 Saisonbericht als Datei weiterschicken</button>` : '')
+    : `<button class="btn b-bl repbtn" data-act="rep" data-v="${UI.viewId || 'live'}">📄 Spielbericht als Datei weiterschicken</button>`;
+  return sw + rb + (UI.scope === 'season' ? renderSeason() : renderGameStats());
 }
 /* ---------- Saison: alle archivierten Spiele (+ laufendes Spiel) ---------- */
 function seasonGames() { const gs = [...S.history].reverse(); if (S.game.events.length) gs.push(S.game); return gs; }
@@ -598,7 +602,8 @@ function renderTeam() {
       <label class="field"><span>Gegner</span><input class="inp" data-f="opp" value="${esc(S.game.opponent)}"></label>
       <label class="field"><span>Halbzeitlänge (Minuten)</span><input class="inp" type="number" inputmode="numeric" data-f="halfmin" value="${S.settings.halfMin}"></label>
       <button class="btn" data-act="lineup">👥 Spieltagskader (${activePlayers().length} von ${S.team.players.length} dabei)</button>
-      <button class="btn b-bl" data-act="share" data-v="live">📤 Spielbericht teilen</button>
+      <button class="btn b-bl" data-act="rep" data-v="live">📄 Spielbericht als Datei weiterschicken</button>
+      <button class="btn" data-act="share" data-v="live">📤 Kurzbericht als Text teilen</button>
       <button class="btn" data-act="newgame">🏁 Spiel abschließen & neues Spiel</button>
     </div>
     <div class="card"><h4>Feldspieler (${pl.length})</h4>
@@ -741,6 +746,62 @@ async function share(id) {
   try { if (navigator.share) { await navigator.share({ text: txt }); return; } } catch (e) { if (e.name === 'AbortError') return; }
   try { await navigator.clipboard.writeText(txt); toast('Bericht kopiert'); } catch (e) { prompt('Bericht kopieren:', txt); }
 }
+/* ---------- Bericht als eigenständige Datei (ohne App lesbar) ---------- */
+// Teilt eine Datei über das Teilen-Menü (Handy) oder lädt sie herunter (PC). Ergebnis: true = erledigt.
+async function shareOrDownload(name, text, type, title) {
+  try {
+    const file = new File([text], name, { type });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title }); return true; }
+  } catch (e) { if (e.name === 'AbortError') return false; }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  return true;
+}
+function reportDoc(kind, gid) {
+  // Statistik-Ansicht rendern (Gesamtes Spiel bzw. Saison) und alles Interaktive entfernen
+  const keep = { half: UI.half, viewId: UI.viewId };
+  UI.half = 0; UI.viewId = kind === 'game' && gid && gid !== 'live' ? gid : null;
+  const g = kind === 'game' ? viewGame() : null;
+  const html = kind === 'season' ? renderSeason() : renderGameStats();
+  Object.assign(UI, keep);
+  const box = document.createElement('div'); box.innerHTML = html;
+  box.querySelectorAll('.seg, .banner, button').forEach(e => e.remove());
+  box.querySelectorAll('[data-act]').forEach(e => e.removeAttribute('data-act'));
+  box.querySelectorAll('.mut.sm').forEach(e => { if (/tippen/i.test(e.textContent)) e.remove(); });
+  const team = (g && g.teamName) || S.team.name, gs = seasonGames();
+  const title = kind === 'season' ? `${team} – Saisonstatistik` : `${team} gegen ${g.opponent}`;
+  const sub = kind === 'season'
+    ? `${gs.length} Spiel${gs.length === 1 ? '' : 'e'}${gs.length ? ' · ' + new Date(gs[0].date).toLocaleDateString('de-DE') + ' – ' + new Date(gs[gs.length - 1].date).toLocaleDateString('de-DE') : ''}`
+    : `Spiel vom ${new Date(g.date).toLocaleDateString('de-DE')} · Feldspieler-Statistik`;
+  const css = document.querySelector('style').textContent;
+  return { title, doc: `<!DOCTYPE html>
+<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${esc(title)}</title>
+<style>${css}
+body{padding:0 0 24px;-webkit-user-select:text;user-select:text}
+.rep-h{padding:14px 2px 10px}.rep-h h1{margin:0;font-size:22px}.rep-h p{margin:4px 0 0;color:var(--mut);font-size:13px}
+.pbtn{margin-top:10px;padding:10px 14px;background:var(--card2);color:var(--tx);border-radius:10px;font-weight:700}
+.expl{font-size:13px;line-height:1.45;color:var(--mut)}.expl b{color:var(--tx)}
+@media print{:root{--bg:#fff;--card:#f3f5f8;--card2:#e6eaf0;--line:#d3d9e1;--tx:#111;--mut:#566170}
+  .pbtn{display:none}.card{break-inside:avoid}tr.top td{background:#dcf5e5}tr.flop td{background:#fbe1e1}.tile,.kpi{border:1px solid var(--line)}}
+</style></head><body><main>
+<div class="rep-h"><h1>🤾 ${esc(title)}</h1><p>${esc(sub)}</p><button class="pbtn" onclick="print()">🖨 Drucken / als PDF speichern</button></div>
+${box.innerHTML}
+<div class="card"><h4>Erklärung</h4><div class="expl">
+<b>HPI</b> (Handball Performance Index) nach Vorbild der HBL: Jeder Spieler startet mit 100 Punkten, Aktionen geben Plus- oder Minuspunkte (Tore je nach Wurfposition, Assists, Ballgewinne, Blocks, Fehler, Zeitstrafen). Daraus wird je nach Position (Rückraum, Außen, Kreis) ein Wert von 50 bis 100. <b class="q-g">Ab 75</b> stark, <b class="q-r">unter 60</b> schwach, etwa 65–68 neutral. In der Rangliste sind die besten 5 grün und die schwächsten 5 rot hinterlegt.<br>
+<b>Abkürzungen:</b> T/W = Tore/Würfe · As = Assists · TF = technische Fehler · BG = Ballgewinne · Blk = Blocks · StF = Stürmerfoul herausgeholt · F→T = Fehler, der zum Gegentor führt · 2' = Zeitstrafen · Pkt = HPI-Punkte (Start 100) · Angr./Abw. = Punkte aus Angriff/Abwehr · Sp = Spiele.<br>
+<b>Positionen:</b> LA/RA = Außen · RL/RM/RR = Rückraum (Fernwurf) · KM = Kreis · DB = Durchbruch · GS = Gegenstoß · 7m = Strafwurf.
+</div></div>
+<p class="mut sm" style="text-align:center">Erstellt am ${new Date().toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' })} mit der Handball-Statistik-App</p>
+</main></body></html>` };
+}
+async function exportReport(v) {
+  const kind = v === 'season' ? 'season' : 'game';
+  const { title, doc } = reportDoc(kind, v);
+  const name = title.replace(/[–—]/g, '-').replace(/[^\wäöüÄÖÜß\- ]+/g, '').trim().replace(/\s+/g, '_') + '_' + new Date().toISOString().slice(0, 10) + '.html';
+  if (await shareOrDownload(name, doc, 'text/html', title)) toast('Bericht erstellt');
+}
 async function exportData() {
   const json = JSON.stringify(S, null, 1), base = 'handball-backup-' + new Date().toISOString().slice(0, 10);
   const done = () => { S.settings.lastBackup = new Date().toISOString(); save(); if (UI.tab === 'team') render(); };
@@ -837,6 +898,7 @@ document.addEventListener('click', ev => {
     case 'delh': if (confirm('Archiviertes Spiel löschen?')) { S.history = S.history.filter(h => h.id !== v); save(); render(); } break;
     case 'chart': UI.sheet = { chart: v }; document.getElementById('toast').classList.remove('show'); renderSheet(); break;
     case 'export': exportData(); break;
+    case 'rep': exportReport(v); break;
     case 'update': location.reload(); break;
     case 'rename': {
       const h = S.history.find(x => x.id === v); if (!h) return;
